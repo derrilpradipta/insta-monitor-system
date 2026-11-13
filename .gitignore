@@ -30,8 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (nilai rahasia tidak boleh masuk repo)
+.env
+.env.local
+.env.*.local
+# file contoh WAJIB ikut supaya orang tahu variabel yang dibutuhkan
+!.env.example
 
 # vercel
 .vercel
