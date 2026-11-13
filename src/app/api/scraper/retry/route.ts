@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { runDailyScrape, runMonthlyReview, syncActiveOrderStatuses } from "@/lib/sync";
 import { logActivity } from "@/lib/activity";
 
-export const maxDuration = 600;
+export const maxDuration = 300;  // batas maksimum Vercel Hobby; Docker/VPS bisa naikkan sendiri
 
 /** Jalankan ulang proses yang gagal. Aman dijalankan ulang (upsert). */
 export async function POST(request: Request) {

@@ -4,7 +4,7 @@ import { notifyDeadlineTomorrow, notifyOverdue, notifyStaleOrders } from "@/lib/
 import { isValidDateString, wibDateString } from "@/lib/time";
 import { prisma } from "@/lib/db";
 
-export const maxDuration = 600;
+export const maxDuration = 300;  // batas maksimum Vercel Hobby; Docker/VPS bisa naikkan sendiri
 
 /**
  * Endpoint cron (dipanggil crontab VPS atau scheduler internal).
