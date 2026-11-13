@@ -17,7 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ reason?: string }>;
 }) {
   const session = await getSession();
-  if (session) redirect("/orders");
+  if (session) redirect("/deadline");
 
   const { reason } = await searchParams;
   const notice = reason ? NOTICES[reason] : undefined;

@@ -13,19 +13,35 @@ export function OrderFilters({
   basePath,
   lockDate,
   extraStatusOptions = [],
+  statusOptions,
 }: {
   branches: Option[];
   basePath: string;
   lockDate?: string;
   extraStatusOptions?: Option[];
+  /** Bila diisi, menggantikan daftar status bawaan. */
+  statusOptions?: Option[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const submit = (formData: FormData) => {
-    const next = new URLSearchParams();
+  /**
+   * Pertahankan parameter lain yang sedang aktif — terutama mode rentang/bulan
+   * di halaman Deadline, supaya menerapkan filter tidak mengembalikan tampilan
+   * ke satu tanggal.
+   */
+  const keepContext = (next: URLSearchParams) => {
+    for (const [key, value] of params.entries()) {
+      if (["q", "branch", "status", "sort", "page", "date"].includes(key)) continue;
+      next.set(key, value);
+    }
     if (lockDate) next.set("date", lockDate);
+    return next;
+  };
+
+  const submit = (formData: FormData) => {
+    const next = keepContext(new URLSearchParams());
     for (const key of ["q", "branch", "status", "sort"]) {
       const value = String(formData.get(key) ?? "").trim();
       if (value) next.set(key, value);
@@ -35,8 +51,8 @@ export function OrderFilters({
   };
 
   const reset = () => {
-    const next = new URLSearchParams();
-    if (lockDate) next.set("date", lockDate);
+    const next = keepContext(new URLSearchParams());
+    next.delete("page");
     startTransition(() => router.push(`${basePath}?${next.toString()}`));
   };
 
@@ -79,10 +95,20 @@ export function OrderFilters({
           aria-label="Filter status"
         >
           <option value="">Semua status</option>
-          <option value="BELUM_SELESAI">Belum selesai</option>
-          <option value="SELESAI">Selesai</option>
-          <option value="DIBATALKAN">Dibatalkan</option>
-          <option value="TERLAMBAT">Terlambat</option>
+          {statusOptions
+            ? statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            : (
+                <>
+                  <option value="BELUM_SELESAI">Belum selesai</option>
+                  <option value="SELESAI">Selesai</option>
+                  <option value="DIBATALKAN">Dibatalkan</option>
+                  <option value="TERLAMBAT">Terlambat</option>
+                </>
+              )}
           {extraStatusOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}

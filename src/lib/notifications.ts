@@ -149,7 +149,7 @@ export async function notifyStaleOrders(): Promise<number> {
       .join(", ")}.`,
     type: "STALE_ORDER",
     priority: "NORMAL",
-    relatedUrl: "/orders?status=BELUM_SELESAI",
+    relatedUrl: "/deadline?status=BELUM_SELESAI",
     dedupeKey: `stale-orders:${today}`,
   });
 }

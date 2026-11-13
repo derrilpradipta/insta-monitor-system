@@ -84,7 +84,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     ipAddress: ip,
   });
 
-  redirect("/orders");
+  redirect("/deadline");
 }
 
 export async function logoutAction(): Promise<void> {

@@ -21,7 +21,9 @@ export function PageHeader({
           <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{description}</p>
         ) : null}
       </div>
-      {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
+      {children ? (
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">{children}</div>
+      ) : null}
     </div>
   );
 }

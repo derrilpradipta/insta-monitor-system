@@ -8,21 +8,18 @@ import {
   CalendarClock,
   ClipboardCheck,
   History,
-  LayoutDashboard,
   LogOut,
   Menu,
   Sparkles,
   UserRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/lib/labels";
 import type { Role } from "@prisma/client";
 
-const MAIN_NAV = [
-  { href: "/orders", label: "Orderan", icon: LayoutDashboard },
-  { href: "/deadline", label: "Deadline", icon: CalendarClock },
-];
+const MAIN_NAV = [{ href: "/deadline", label: "Deadline", icon: CalendarClock }];
 
 const SUPPORT_NAV = [
   { href: "/monthly-review", label: "Pemeriksaan Bulanan", icon: ClipboardCheck },
@@ -65,7 +62,7 @@ export function SidebarNav({
   }: {
     href: string;
     label: string;
-    icon: typeof LayoutDashboard;
+    icon: LucideIcon;
     badge?: number;
   }) => {
     const active = isActive(href);

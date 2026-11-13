@@ -52,7 +52,7 @@ export default async function NotificationsPage({
           description="Notifikasi pengambilan data, tenggat, dan pemeriksaan bulanan akan muncul di sini."
           action={
             <Button asChild variant="outline" size="sm" className="mt-3">
-              <Link href="/orders">
+              <Link href="/deadline">
                 <BellOff className="size-4" /> Kembali ke orderan
               </Link>
             </Button>

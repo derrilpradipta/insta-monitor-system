@@ -241,7 +241,7 @@ export async function requireSession(): Promise<SessionPayload> {
 /** Wajib memiliki salah satu peran. */
 export async function requireRole(roles: Role[]): Promise<SessionPayload> {
   const session = await requireSession();
-  if (!roles.includes(session.user.role)) redirect("/orders?denied=1");
+  if (!roles.includes(session.user.role)) redirect("/deadline?denied=1");
   return session;
 }
 

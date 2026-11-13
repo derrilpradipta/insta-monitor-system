@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 import type { Branch, MonitoringStatus, Order, SourceStatusCategory } from "@prisma/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MonitoringBadge, SourceBadge } from "@/components/orders/status-badge";
@@ -11,9 +12,11 @@ export type OrderRow = Order & {
 export function OrdersTable({
   orders,
   showOrderDate = true,
+  showMonitoring = true,
 }: {
   orders: OrderRow[];
   showOrderDate?: boolean;
+  showMonitoring?: boolean;
 }) {
   const today = wibDateString();
 
@@ -22,13 +25,13 @@ export function OrdersTable({
       <TableHeader>
         <TableRow>
           <TableHead className="w-[10%]">No. pesanan</TableHead>
-          <TableHead className="w-[17%]">Pelanggan</TableHead>
-          <TableHead className="w-[11%]">Cabang</TableHead>
-          <TableHead className="w-[16%]">Produk</TableHead>
-          {showOrderDate ? <TableHead className="w-[8%]">Masuk</TableHead> : null}
-          <TableHead className="w-[9%]">Tenggat</TableHead>
-          <TableHead className="w-[17%]">Status sumber</TableHead>
-          <TableHead className="w-[12%]">Pemantauan</TableHead>
+          <TableHead className="w-[16%]">Pelanggan</TableHead>
+          <TableHead className="w-[12%]">Cabang</TableHead>
+          <TableHead className="w-[13%]">Produk</TableHead>
+          {showOrderDate ? <TableHead className="w-[10%]">Masuk</TableHead> : null}
+          <TableHead className="w-[11%]">Tenggat</TableHead>
+          <TableHead className="w-[18%]">Status sumber</TableHead>
+          {showMonitoring ? <TableHead className="w-[12%]">Pemantauan</TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -40,8 +43,16 @@ export function OrdersTable({
           return (
             <TableRow key={order.id}>
               <TableCell className="align-top">
-                <span className="block truncate font-medium text-foreground" title={order.orderNumber}>
-                  {order.orderNumber}
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate font-medium text-foreground" title={order.orderNumber}>
+                    {order.orderNumber}
+                  </span>
+                  {order.monitoringStatus === "SELESAI" ? (
+                    <CheckCircle2
+                      className="size-3.5 shrink-0 text-emerald-600"
+                      aria-label="Sudah selesai"
+                    />
+                  ) : null}
                 </span>
                 {order.sourceUrl ? (
                   <Link
@@ -73,18 +84,18 @@ export function OrdersTable({
                 </p>
               </TableCell>
               {showOrderDate ? (
-                <TableCell className="whitespace-nowrap align-top text-sm text-muted-foreground">
-                  {formatDateId(order.orderDate)}
+                <TableCell className="whitespace-nowrap align-top">
+                  <span className="block text-[12.5px] text-muted-foreground">{formatDateId(order.orderDate)}</span>
                 </TableCell>
               ) : null}
               <TableCell className="align-top">
                 <span
                   className={
                     lateDays > 0
-                      ? "block whitespace-nowrap text-sm font-medium text-red-600"
+                      ? "block whitespace-nowrap text-[12.5px] font-medium text-red-600"
                       : order.deadlineDate
-                        ? "block whitespace-nowrap text-sm text-muted-foreground"
-                        : "block whitespace-nowrap text-sm italic text-muted-foreground/70"
+                        ? "block whitespace-nowrap text-[12.5px] text-muted-foreground"
+                        : "block whitespace-nowrap text-[12.5px] italic text-muted-foreground/70"
                   }
                 >
                   {order.deadlineDate ? formatDateId(order.deadlineDate) : "Tanpa tenggat"}
@@ -99,6 +110,7 @@ export function OrdersTable({
                   raw={order.sourceStatus}
                 />
               </TableCell>
+              {showMonitoring ? (
               <TableCell className="overflow-hidden align-top">
                 <span
                   className="inline-flex"
@@ -118,6 +130,7 @@ export function OrdersTable({
                   />
                 </span>
               </TableCell>
+              ) : null}
             </TableRow>
           );
         })}

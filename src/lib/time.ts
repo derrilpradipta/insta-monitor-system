@@ -60,6 +60,14 @@ export function isValidDateString(value: unknown): value is string {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 
+/** Validasi string bulan "YYYY-MM". */
+export function isValidMonthString(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  if (!/^\d{4}-\d{2}$/.test(value)) return false;
+  const [year, month] = value.split("-").map(Number) as [number, number];
+  return year >= 2000 && year <= 2100 && month >= 1 && month <= 12;
+}
+
 /** Date object (UTC midnight) untuk kolom @db.Date dari string YYYY-MM-DD. */
 export function dateOnlyToDb(dateString: string): Date {
   return new Date(`${dateString}T00:00:00.000Z`);
