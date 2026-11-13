@@ -1,0 +1,295 @@
+// Prisma schema — Instaprint Monitoring System
+// Database: PostgreSQL (Neon). Timestamps disimpan UTC, dikonversi WIB di layer aplikasi.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  PIMPINAN
+  STAFF
+}
+
+/// Kategori hasil normalisasi status sumber (website internal)
+enum SourceStatusCategory {
+  BARU
+  PROSES
+  SELESAI
+  DIBATALKAN
+  LAINNYA
+}
+
+/// Status pemantauan milik aplikasi monitoring (terpisah dari status sumber)
+enum MonitoringStatus {
+  BELUM_SELESAI
+  SELESAI
+  DIBATALKAN
+}
+
+enum StatusSource {
+  AUTO
+  MANUAL
+}
+
+enum ProcessType {
+  DAILY_SCRAPE
+  STATUS_SYNC
+  MONTHLY_REVIEW
+}
+
+enum ProcessStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum ReviewStatus {
+  PENDING
+  DONE
+  SKIPPED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  SCRAPE_SUCCESS
+  SCRAPE_FAILED
+  DEADLINE_TOMORROW
+  ORDER_OVERDUE
+  MONTHLY_REVIEW_DONE
+  REVIEW_PENDING
+  STALE_ORDER
+  SYNC_ERROR
+}
+
+enum MonthlyReviewStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  role               Role      @default(STAFF)
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  sessions           UserSession[]
+  activityLogs       ActivityLog[]
+  notifications      Notification[]
+  confirmedOrders    Order[]       @relation("OrderManualConfirmedBy")
+  checkedReviewItems ReviewItem[]  @relation("ReviewCheckedBy")
+  monthlyReviews     MonthlyReview[] @relation("MonthlyReviewCreatedBy")
+
+  @@index([role, isActive])
+  @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  sessionTokenHash String    @unique @map("session_token_hash")
+  lastActivityAt   DateTime  @default(now()) @map("last_activity_at")
+  expiresAt        DateTime  @map("expires_at")
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model Branch {
+  id         String   @id @default(cuid())
+  branchName String   @map("branch_name")
+  branchCode String   @unique @map("branch_code")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  orders      Order[]
+  reviewItems ReviewItem[]
+
+  @@map("branches")
+}
+
+model Order {
+  id                   String        @id @default(cuid())
+  sourceOrderId        String        @map("source_order_id")
+  orderNumber          String        @map("order_number")
+  branchId             String        @map("branch_id")
+  customerName         String        @map("customer_name")
+  customerPhone        String?       @map("customer_phone")
+  productName          String        @map("product_name")
+  orderDate            DateTime      @db.Date @map("order_date")
+  deadlineDate         DateTime?     @db.Date @map("deadline_date")
+  sourceStatus         String        @map("source_status")
+  sourceStatusCategory SourceStatusCategory @default(LAINNYA) @map("source_status_category")
+  monitoringStatus     MonitoringStatus @default(BELUM_SELESAI) @map("monitoring_status")
+  monitoringStatusSource StatusSource?  @map("monitoring_status_source")
+  monitoringStatusChangedAt DateTime? @map("monitoring_status_changed_at")
+  manualConfirmed      Boolean       @default(false) @map("manual_confirmed")
+  manualConfirmedBy    String?       @map("manual_confirmed_by")
+  manualConfirmedAt    DateTime?     @map("manual_confirmed_at")
+  lastScrapedAt        DateTime?     @map("last_scraped_at")
+  sourceUrl            String?       @map("source_url")
+  notes                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  branch          Branch           @relation(fields: [branchId], references: [id])
+  manualConfirmedByUser User?      @relation("OrderManualConfirmedBy", fields: [manualConfirmedBy], references: [id])
+  snapshots       OrderSnapshot[]
+  reviewItems     ReviewItem[]
+
+  @@unique([branchId, sourceOrderId])
+  @@index([orderDate])
+  @@index([deadlineDate])
+  @@index([branchId, orderDate])
+  @@index([monitoringStatus, deadlineDate])
+  @@index([sourceStatusCategory])
+  @@index([orderNumber])
+  @@index([customerName])
+  @@map("orders")
+}
+
+model OrderSnapshot {
+  id           String   @id @default(cuid())
+  orderId      String   @map("order_id")
+  sourceData   Json     @map("source_data")
+  sourceStatus String   @map("source_status")
+  scrapedAt    DateTime @default(now()) @map("scraped_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, scrapedAt])
+  @@map("order_snapshots")
+}
+
+model ScrapingLog {
+  id           String        @id @default(cuid())
+  processType  ProcessType   @map("process_type")
+  status       ProcessStatus @default(RUNNING)
+  startedAt    DateTime      @default(now()) @map("started_at")
+  finishedAt   DateTime?     @map("finished_at")
+  totalFound   Int           @default(0) @map("total_found")
+  totalCreated Int           @default(0) @map("total_created")
+  totalUpdated Int           @default(0) @map("total_updated")
+  totalSkipped Int           @default(0) @map("total_skipped")
+  totalFailed  Int           @default(0) @map("total_failed")
+  targetDate   DateTime?     @db.Date @map("target_date")
+  retryOfId    String?       @map("retry_of_id")
+  triggeredBy  String?       @map("triggered_by")
+  errorMessage String?       @map("error_message")
+  detail       Json?         @map("detail")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([processType, startedAt])
+  @@index([status])
+  @@map("scraping_logs")
+}
+
+model MonthlyReview {
+  id           String              @id @default(cuid())
+  month        Int
+  year         Int
+  status       MonthlyReviewStatus @default(RUNNING)
+  startedAt    DateTime            @default(now()) @map("started_at")
+  finishedAt   DateTime?           @map("finished_at")
+  totalOrders  Int                 @default(0) @map("total_orders")
+  totalChecked Int                 @default(0) @map("total_checked")
+  totalPending Int                 @default(0) @map("total_pending")
+  createdBy    String?             @map("created_by")
+  scrapingLogId String?            @map("scraping_log_id")
+  errorMessage String?             @map("error_message")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  createdByUser User?       @relation("MonthlyReviewCreatedBy", fields: [createdBy], references: [id])
+  items         ReviewItem[]
+
+  @@unique([year, month])
+  @@map("monthly_reviews")
+}
+
+model ReviewItem {
+  id              String       @id @default(cuid())
+  monthlyReviewId String       @map("monthly_review_id")
+  orderId         String       @map("order_id")
+  branchId        String       @map("branch_id")
+  reviewStatus    ReviewStatus @default(PENDING) @map("review_status")
+  checkedBy       String?      @map("checked_by")
+  checkedAt       DateTime?    @map("checked_at")
+  notes           String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  monthlyReview MonthlyReview @relation(fields: [monthlyReviewId], references: [id], onDelete: Cascade)
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  checkedByUser User?         @relation("ReviewCheckedBy", fields: [checkedBy], references: [id])
+
+  @@unique([monthlyReviewId, orderId])
+  @@index([branchId, reviewStatus])
+  @@map("review_items")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  description String?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model Notification {
+  id         String              @id @default(cuid())
+  userId     String?             @map("user_id")
+  title      String
+  message    String
+  type       NotificationType
+  priority   NotificationPriority @default(NORMAL)
+  isRead     Boolean             @default(false) @map("is_read")
+  relatedUrl String?             @map("related_url")
+  dedupeKey  String?             @unique @map("dedupe_key")
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([type, createdAt])
+  @@map("notifications")
+}
