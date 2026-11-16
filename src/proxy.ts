@@ -25,9 +25,13 @@ export default function proxy(request: NextRequest) {
   const hasSession = request.cookies.has("ipms_session");
   if (hasSession) return NextResponse.next();
 
+  // Cookie tidak ada berarti pengguna memang belum login (kunjungan pertama,
+  // atau cookie sudah dibersihkan browser). Jangan tampilkan pesan
+  // "sesi berakhir" — itu hanya untuk sesi yang benar-benar timeout, dan kasus
+  // itu ditangani requireSession() karena cookienya masih ada.
   const url = request.nextUrl.clone();
   url.pathname = "/login";
-  url.search = "?reason=expired";
+  url.search = "";
   return NextResponse.redirect(url);
 }
 
