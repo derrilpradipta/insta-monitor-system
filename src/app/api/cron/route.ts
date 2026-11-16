@@ -15,8 +15,18 @@ export const maxDuration = 300;  // batas maksimum Vercel Hobby; Docker/VPS bisa
  */
 async function handle(request: Request) {
   const secret = process.env.CRON_SECRET;
-  const provided = request.headers.get("x-cron-secret");
-  if (!secret || provided !== secret) {
+
+  // Dua cara autentikasi:
+  // 1. Header `x-cron-secret` — dipakai crontab VPS / pemanggil manual.
+  // 2. `Authorization: Bearer <CRON_SECRET>` — format yang dikirim Vercel Cron Jobs.
+  const providedHeader = request.headers.get("x-cron-secret");
+  const authorization = request.headers.get("authorization") ?? "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
+
+  const authorized =
+    Boolean(secret) && (providedHeader === secret || bearer === secret);
+
+  if (!authorized) {
     return NextResponse.json({ ok: false, message: "Tidak diizinkan." }, { status: 401 });
   }
 
