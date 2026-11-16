@@ -15,7 +15,25 @@ import {
 } from "@/components/ui/dialog";
 import { monthLabelId } from "@/lib/time";
 
-export function RunReviewButton({ year, month }: { year: number; month: number }) {
+/**
+ * Tombol pemeriksaan bulanan.
+ *
+ * Di Vercel tombol ini dinonaktifkan: pemeriksaan bulanan butuh 685–1352 detik
+ * (terukur dari database), sedangkan batas maksimum fungsi Vercel Hobby 300
+ * detik. Kalau dibiarkan aktif, hasilnya tombol yang selalu gagal di tengah
+ * jalan. Pemeriksaan bulanan dijalankan di VPS/Docker yang menyala 24 jam.
+ */
+export function RunReviewButton({
+  year,
+  month,
+  disabled = false,
+  disabledReason,
+}: {
+  year: number;
+  month: number;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -39,6 +57,14 @@ export function RunReviewButton({ year, month }: { year: number; month: number }
       router.refresh();
     });
   };
+
+  if (disabled) {
+    return (
+      <Button size="sm" disabled title={disabledReason} aria-disabled>
+        <PlayCircle className="size-4" /> Periksa {monthLabelId(month, year)}
+      </Button>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

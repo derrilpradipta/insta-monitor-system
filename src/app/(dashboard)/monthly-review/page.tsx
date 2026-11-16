@@ -43,7 +43,12 @@ export default async function MonthlyReviewPage() {
         title="Pemeriksaan Bulanan"
         description="Ambil ulang seluruh pesanan satu bulan, lalu konfirmasi manual untuk pesanan yang belum selesai."
       >
-        <RunReviewButton year={now.year} month={now.month} />
+        <RunReviewButton
+          year={now.year}
+          month={now.month}
+          disabled={Boolean(process.env.VERCEL)}
+          disabledReason="Pemeriksaan bulanan butuh lebih dari 5 menit — melebihi batas waktu Vercel. Jalankan dari PC/VPS yang menyala 24 jam."
+        />
       </PageHeader>
 
       <StatStrip

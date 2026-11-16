@@ -21,6 +21,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Bulan tidak valid." }, { status: 400 });
   }
 
+  // Pemeriksaan bulanan butuh 685–1352 detik (terukur), sementara batas fungsi
+  // Vercel Hobby 300 detik. Menjalankannya di sini hanya akan terpotong di
+  // tengah jalan, jadi ditolak lebih awal dengan pesan yang jelas.
+  if (process.env.VERCEL) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Pemeriksaan bulanan tidak bisa dijalankan di Vercel (butuh lebih dari 5 menit). Jalankan dari PC/VPS yang menyala 24 jam.",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
     const result = await runMonthlyReview({ year, month, createdBy: session.user.id });
     await logActivity({

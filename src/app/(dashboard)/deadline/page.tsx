@@ -21,6 +21,7 @@ import { PageHeader, EmptyState } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { ChecklistUploadButton } from "@/components/orders/checklist-upload-button";
+import { RunScrapeButton } from "@/components/orders/run-scrape-button";
 
 export const metadata = { title: "Deadline" };
 export const dynamic = "force-dynamic";
@@ -211,7 +212,8 @@ export default async function DeadlinePage({ searchParams }: { searchParams: Pro
             Tanpa tenggat{noDeadlineCount ? ` (${noDeadlineCount})` : ""}
           </Link>
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <RunScrapeButton defaultDate={today} />
           <Button asChild>
             <a href={`/api/export/deadline?${exportQuery.toString()}`}>
               <Download className="size-4" />
