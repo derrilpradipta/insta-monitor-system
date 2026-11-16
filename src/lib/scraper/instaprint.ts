@@ -12,8 +12,66 @@
  *   Status Pembayaran, Tanggal Order, Deadline, Nama Pelanggan, PIC, dan
  *   Deadline per produk. Halaman ini terbuka untuk pesanan pada tahap mana pun.
  */
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { cleanCustomerName } from "@/lib/text";
+
+type PlaywrightModule = typeof import("playwright");
+let playwrightModule: PlaywrightModule | null = null;
+
+/**
+ * Playwright dimuat secara lazy, BUKAN di level atas modul.
+ *
+ * Alasannya: modul ini ikut dirangkai ke dalam rantai
+ * instrumentation -> scheduler -> sync -> scraper. Kalau `playwright` diimpor
+ * di level atas, Next.js memuatnya pada SETIAP request (termasuk /login), dan
+ * di Vercel itu gagal karena `playwright-core/browsers.json` tidak ikut ke
+ * bundel fungsi serverless. Akibatnya seluruh aplikasi 500.
+ *
+ * Dengan lazy import, halaman biasa tidak pernah menyentuh Playwright; hanya
+ * proses pengambilan data yang memuatnya.
+ */
+async function loadPlaywright(): Promise<PlaywrightModule> {
+  if (!playwrightModule) {
+    playwrightModule = await import("playwright");
+  }
+  return playwrightModule;
+}
+
+type ServerlessChromium = {
+  executablePath: string;
+  args: string[];
+};
+
+/**
+ * Chromium untuk lingkungan serverless (Vercel/AWS Lambda).
+ *
+ * Playwright tidak menyertakan biner browser di bundel fungsi serverless, dan
+ * Playwright miliknya sendiri (451 MB) jauh melebihi batas 250 MB. Paket
+ * `@sparticuz/chromium` menyediakan Chromium ~67 MB yang diekstrak ke /tmp saat
+ * pertama dipakai — itu yang kita pakai bila berjalan di serverless.
+ *
+ * Di lokal/Docker, fungsi ini mengembalikan null sehingga Playwright memakai
+ * biner bawaannya seperti biasa.
+ */
+async function loadServerlessChromium(): Promise<ServerlessChromium | null> {
+  const serverless = Boolean(process.env.VERCEL) || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
+  if (!serverless) return null;
+
+  try {
+    const mod = await import("@sparticuz/chromium");
+    const chromium = (mod.default ?? mod) as unknown as {
+      args: string[];
+      executablePath: () => Promise<string>;
+    };
+    const executablePath = await chromium.executablePath();
+    return { executablePath, args: chromium.args };
+  } catch (error) {
+    console.error("[scraper] gagal memuat @sparticuz/chromium:", error);
+    throw new Error(
+      "Chromium serverless tidak tersedia. Pengambilan data otomatis sebaiknya dijalankan di VPS/Docker.",
+    );
+  }
+}
 
 export type ScrapedOrderRow = {
   sourceId: string;
@@ -125,9 +183,12 @@ export class InstaprintClient {
 
   async open(): Promise<void> {
     if (this.page) return;
+    const { chromium } = await loadPlaywright();
+    const serverless = await loadServerlessChromium();
     this.browser = await chromium.launch({
       headless: this.headless,
-      args: ["--disable-dev-shm-usage", "--no-sandbox"],
+      ...(serverless ?? {}),
+      args: serverless ? serverless.args : ["--disable-dev-shm-usage", "--no-sandbox"],
     });
     this.context = await this.browser.newContext({
       locale: "id-ID",

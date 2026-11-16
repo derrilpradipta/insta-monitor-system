@@ -15,8 +15,26 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  // Playwright (dengan binary Chromium) harus tetap di luar bundle server.
-  serverExternalPackages: ["playwright", "playwright-core"],
+  // Playwright dan Chromium serverless harus tetap di luar bundle JavaScript
+  // (keduanya membawa biner besar yang harus dibaca langsung dari node_modules).
+  serverExternalPackages: [
+    "playwright",
+    "playwright-core",
+    "@sparticuz/chromium",
+    "@sparticuz/chromium-min",
+  ],
+
+  // Pastikan biner Chromium serverless IKUT dikemas ke fungsi yang melakukan
+  // scraping — tanpa ini, file tracing bisa membuangnya dan launch gagal.
+  ...(process.env.VERCEL
+    ? {
+        outputFileTracingIncludes: {
+          "/api/scraper/**": ["./node_modules/@sparticuz/chromium/**"],
+          "/api/cron/**": ["./node_modules/@sparticuz/chromium/**"],
+          "/api/monthly/**": ["./node_modules/@sparticuz/chromium/**"],
+        },
+      }
+    : {}),
 
   // Saat dev server diakses lewat tunnel (cloudflared/ngrok) untuk demo,
   // Next.js memblokir aset dev dari origin lain sehingga React tidak pernah
