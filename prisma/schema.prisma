@@ -82,23 +82,23 @@ enum MonthlyReviewStatus {
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  name               String
-  email              String    @unique
-  passwordHash       String    @map("password_hash")
-  role               Role      @default(STAFF)
-  isActive           Boolean   @default(true) @map("is_active")
-  lastLoginAt        DateTime? @map("last_login_at")
-  failedLoginCount   Int       @default(0) @map("failed_login_count")
-  lockedUntil        DateTime? @map("locked_until")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  passwordHash     String    @map("password_hash")
+  role             Role      @default(STAFF)
+  isActive         Boolean   @default(true) @map("is_active")
+  lastLoginAt      DateTime? @map("last_login_at")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   sessions           UserSession[]
   activityLogs       ActivityLog[]
   notifications      Notification[]
-  confirmedOrders    Order[]       @relation("OrderManualConfirmedBy")
-  checkedReviewItems ReviewItem[]  @relation("ReviewCheckedBy")
+  confirmedOrders    Order[]         @relation("OrderManualConfirmedBy")
+  checkedReviewItems ReviewItem[]    @relation("ReviewCheckedBy")
   monthlyReviews     MonthlyReview[] @relation("MonthlyReviewCreatedBy")
 
   @@index([role, isActive])
@@ -138,33 +138,33 @@ model Branch {
 }
 
 model Order {
-  id                   String        @id @default(cuid())
-  sourceOrderId        String        @map("source_order_id")
-  orderNumber          String        @map("order_number")
-  branchId             String        @map("branch_id")
-  customerName         String        @map("customer_name")
-  customerPhone        String?       @map("customer_phone")
-  productName          String        @map("product_name")
-  orderDate            DateTime      @db.Date @map("order_date")
-  deadlineDate         DateTime?     @db.Date @map("deadline_date")
-  sourceStatus         String        @map("source_status")
-  sourceStatusCategory SourceStatusCategory @default(LAINNYA) @map("source_status_category")
-  monitoringStatus     MonitoringStatus @default(BELUM_SELESAI) @map("monitoring_status")
-  monitoringStatusSource StatusSource?  @map("monitoring_status_source")
-  monitoringStatusChangedAt DateTime? @map("monitoring_status_changed_at")
-  manualConfirmed      Boolean       @default(false) @map("manual_confirmed")
-  manualConfirmedBy    String?       @map("manual_confirmed_by")
-  manualConfirmedAt    DateTime?     @map("manual_confirmed_at")
-  lastScrapedAt        DateTime?     @map("last_scraped_at")
-  sourceUrl            String?       @map("source_url")
-  notes                String?
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
+  id                        String               @id @default(cuid())
+  sourceOrderId             String               @map("source_order_id")
+  orderNumber               String               @map("order_number")
+  branchId                  String               @map("branch_id")
+  customerName              String               @map("customer_name")
+  customerPhone             String?              @map("customer_phone")
+  productName               String               @map("product_name")
+  orderDate                 DateTime             @map("order_date") @db.Date
+  deadlineDate              DateTime?            @map("deadline_date") @db.Date
+  sourceStatus              String               @map("source_status")
+  sourceStatusCategory      SourceStatusCategory @default(LAINNYA) @map("source_status_category")
+  monitoringStatus          MonitoringStatus     @default(BELUM_SELESAI) @map("monitoring_status")
+  monitoringStatusSource    StatusSource?        @map("monitoring_status_source")
+  monitoringStatusChangedAt DateTime?            @map("monitoring_status_changed_at")
+  manualConfirmed           Boolean              @default(false) @map("manual_confirmed")
+  manualConfirmedBy         String?              @map("manual_confirmed_by")
+  manualConfirmedAt         DateTime?            @map("manual_confirmed_at")
+  lastScrapedAt             DateTime?            @map("last_scraped_at")
+  sourceUrl                 String?              @map("source_url")
+  notes                     String?
+  createdAt                 DateTime             @default(now()) @map("created_at")
+  updatedAt                 DateTime             @updatedAt @map("updated_at")
 
-  branch          Branch           @relation(fields: [branchId], references: [id])
-  manualConfirmedByUser User?      @relation("OrderManualConfirmedBy", fields: [manualConfirmedBy], references: [id])
-  snapshots       OrderSnapshot[]
-  reviewItems     ReviewItem[]
+  branch                Branch          @relation(fields: [branchId], references: [id])
+  manualConfirmedByUser User?           @relation("OrderManualConfirmedBy", fields: [manualConfirmedBy], references: [id])
+  snapshots             OrderSnapshot[]
+  reviewItems           ReviewItem[]
 
   @@unique([branchId, sourceOrderId])
   @@index([orderDate])
@@ -202,7 +202,7 @@ model ScrapingLog {
   totalUpdated Int           @default(0) @map("total_updated")
   totalSkipped Int           @default(0) @map("total_skipped")
   totalFailed  Int           @default(0) @map("total_failed")
-  targetDate   DateTime?     @db.Date @map("target_date")
+  targetDate   DateTime?     @map("target_date") @db.Date
   retryOfId    String?       @map("retry_of_id")
   triggeredBy  String?       @map("triggered_by")
   errorMessage String?       @map("error_message")
@@ -215,21 +215,21 @@ model ScrapingLog {
 }
 
 model MonthlyReview {
-  id           String              @id @default(cuid())
-  month        Int
-  year         Int
-  status       MonthlyReviewStatus @default(RUNNING)
-  startedAt    DateTime            @default(now()) @map("started_at")
-  finishedAt   DateTime?           @map("finished_at")
-  totalOrders  Int                 @default(0) @map("total_orders")
-  totalChecked Int                 @default(0) @map("total_checked")
-  totalPending Int                 @default(0) @map("total_pending")
-  createdBy    String?             @map("created_by")
-  scrapingLogId String?            @map("scraping_log_id")
-  errorMessage String?             @map("error_message")
-  createdAt    DateTime            @default(now()) @map("created_at")
+  id            String              @id @default(cuid())
+  month         Int
+  year          Int
+  status        MonthlyReviewStatus @default(RUNNING)
+  startedAt     DateTime            @default(now()) @map("started_at")
+  finishedAt    DateTime?           @map("finished_at")
+  totalOrders   Int                 @default(0) @map("total_orders")
+  totalChecked  Int                 @default(0) @map("total_checked")
+  totalPending  Int                 @default(0) @map("total_pending")
+  createdBy     String?             @map("created_by")
+  scrapingLogId String?             @map("scraping_log_id")
+  errorMessage  String?             @map("error_message")
+  createdAt     DateTime            @default(now()) @map("created_at")
 
-  createdByUser User?       @relation("MonthlyReviewCreatedBy", fields: [createdBy], references: [id])
+  createdByUser User?        @relation("MonthlyReviewCreatedBy", fields: [createdBy], references: [id])
   items         ReviewItem[]
 
   @@unique([year, month])
@@ -276,20 +276,72 @@ model ActivityLog {
 }
 
 model Notification {
-  id         String              @id @default(cuid())
-  userId     String?             @map("user_id")
+  id         String               @id @default(cuid())
+  userId     String?              @map("user_id")
   title      String
   message    String
   type       NotificationType
   priority   NotificationPriority @default(NORMAL)
-  isRead     Boolean             @default(false) @map("is_read")
-  relatedUrl String?             @map("related_url")
-  dedupeKey  String?             @unique @map("dedupe_key")
-  createdAt  DateTime            @default(now()) @map("created_at")
+  isRead     Boolean              @default(false) @map("is_read")
+  relatedUrl String?              @map("related_url")
+  dedupeKey  String?              @unique @map("dedupe_key")
+  createdAt  DateTime             @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
   @@index([type, createdAt])
   @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Pemantauan email (IMAP)
+// ---------------------------------------------------------------------------
+
+/// Satu email yang pernah terbaca saat statusnya belum dibaca.
+/// Dibaca lewat IMAP dengan BODY.PEEK[], jadi mengambil isinya TIDAK mengubah
+/// status belum-dibaca di mailbox asli.
+model EmailMessage {
+  id             String   @id @default(cuid())
+  /// Folder asal, mis. INBOX.
+  mailbox        String   @default("INBOX")
+  /// UID IMAP; unik bersama uidValidity agar aman saat UIDVALIDITY berubah.
+  uid            Int?
+  uidValidity    BigInt?
+  /// Header Message-ID; kunci alami untuk mencegah duplikat.
+  messageId      String   @unique @map("message_id")
+  fromName       String?  @map("from_name")
+  fromAddress    String   @map("from_address")
+  subject        String
+  /// Cuplikan isi (teks polos, dipotong).
+  snippet        String
+  receivedAt     DateTime @map("received_at")
+  hasAttachments Boolean  @default(false) @map("has_attachments")
+  /// true bila email sudah dibaca di mailbox (hilang dari daftar UNSEEN).
+  isRead         Boolean  @default(false) @map("is_read")
+  firstSeenAt    DateTime @default(now()) @map("first_seen_at")
+  lastSyncedAt   DateTime @default(now()) @map("last_synced_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([receivedAt])
+  @@index([isRead, receivedAt])
+  @@map("email_messages")
+}
+
+/// Catatan setiap proses pengambilan email, untuk halaman riwayat email.
+model EmailSyncRun {
+  id           String    @id @default(cuid())
+  status       String    @default("RUNNING")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  unreadFound  Int       @default(0) @map("unread_found")
+  created      Int       @default(0)
+  updated      Int       @default(0)
+  markedRead   Int       @default(0) @map("marked_read")
+  errorMessage String?   @map("error_message")
+  triggeredBy  String?   @map("triggered_by")
+
+  @@index([startedAt])
+  @@map("email_sync_runs")
 }
