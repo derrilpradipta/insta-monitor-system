@@ -60,8 +60,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, logId: newLogId });
   } catch (error) {
+    console.error("[scraper/retry] gagal:", error);
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "Gagal menjalankan ulang." },
+      { ok: false, message: "Terjadi kesalahan pada server. Silakan coba lagi." },
       { status: 500 },
     );
   }

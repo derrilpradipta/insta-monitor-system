@@ -28,12 +28,11 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, logId, result });
   } catch (error) {
-    // Jangan bocorkan dump argumen Chromium ke pengguna. Ambil baris pertama saja.
-    const raw = error instanceof Error ? error.message : "Pengambilan data gagal.";
-    const firstLine = raw.split("\n")[0].slice(0, 200);
-    const friendly = /spawn|ENOENT|Failed to launch/i.test(raw)
-      ? "Browser untuk pengambilan data tidak bisa dijalankan di server ini. Jalankan pengambilan data dari PC/VPS."
-      : firstLine;
-    return NextResponse.json({ ok: false, message: friendly }, { status: 500 });
+    // Detail teknis hanya masuk log server; pengguna cukup melihat pesan umum.
+    console.error("[scraper/run] gagal:", error);
+    return NextResponse.json(
+      { ok: false, message: "Terjadi kesalahan pada server. Silakan coba lagi." },
+      { status: 500 },
+    );
   }
 }

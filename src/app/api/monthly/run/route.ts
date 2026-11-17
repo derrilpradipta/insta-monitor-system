@@ -46,8 +46,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    console.error("[monthly/run] gagal:", error);
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "Pemeriksaan gagal." },
+      { ok: false, message: "Terjadi kesalahan pada server. Silakan coba lagi." },
       { status: 500 },
     );
   }

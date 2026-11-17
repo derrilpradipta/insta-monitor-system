@@ -26,19 +26,27 @@ export function RunScrapeButton({ defaultDate }: { defaultDate: string }) {
   const run = () => {
     setError(null);
     startTransition(async () => {
-      const response = await fetch("/api/scraper/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date }),
-      });
-      const data = (await response.json()) as { ok?: boolean; logId?: string; message?: string };
-      if (!response.ok || !data.ok) {
-        setError(data.message ?? "Pengambilan data gagal.");
-        return;
+      try {
+        const response = await fetch("/api/scraper/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date }),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          ok?: boolean;
+          logId?: string;
+          message?: string;
+        };
+        if (!response.ok || !data.ok) {
+          setError(data.message ?? "Terjadi kesalahan pada server. Silakan coba lagi.");
+          return;
+        }
+        setOpen(false);
+        if (data.logId) router.push(`/history/${data.logId}`);
+        router.refresh();
+      } catch {
+        setError("Tidak dapat menghubungi server. Periksa koneksi lalu coba lagi.");
       }
-      setOpen(false);
-      if (data.logId) router.push(`/history/${data.logId}`);
-      router.refresh();
     });
   };
 

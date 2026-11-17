@@ -67,8 +67,9 @@ async function handle(request: Request) {
 
     return NextResponse.json({ ok: false, message: `Job "${job}" tidak dikenal.` }, { status: 400 });
   } catch (error) {
+    console.error(`[cron] job "${job}" gagal:`, error);
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "Job gagal." },
+      { ok: false, message: "Terjadi kesalahan pada server. Silakan coba lagi." },
       { status: 500 },
     );
   }
