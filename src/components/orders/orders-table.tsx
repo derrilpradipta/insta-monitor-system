@@ -24,14 +24,15 @@ export function OrdersTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[10%]">No. pesanan</TableHead>
-          <TableHead className="w-[16%]">Pelanggan</TableHead>
-          <TableHead className="w-[12%]">Cabang</TableHead>
-          <TableHead className="w-[13%]">Produk</TableHead>
-          {showOrderDate ? <TableHead className="w-[10%]">Masuk</TableHead> : null}
-          <TableHead className="w-[11%]">Tenggat</TableHead>
-          <TableHead className="w-[18%]">Status sumber</TableHead>
-          {showMonitoring ? <TableHead className="w-[12%]">Pemantauan</TableHead> : null}
+          <TableHead className="w-[11%]">No. pesanan</TableHead>
+          <TableHead className="w-[13%]">Pelanggan</TableHead>
+          <TableHead className="w-[9%]">Cabang</TableHead>
+          <TableHead className="w-[10%]">Produk</TableHead>
+          {showOrderDate ? <TableHead className="w-[9%]">Masuk</TableHead> : null}
+          <TableHead className="w-[10%]">Tenggat</TableHead>
+          <TableHead className="w-[13%]">Keterangan</TableHead>
+          <TableHead className="w-[12%]">Status sumber</TableHead>
+          {showMonitoring ? <TableHead className="w-[10%]">Pemantauan</TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -103,6 +104,18 @@ export function OrdersTable({
                 {lateDays > 0 ? (
                   <span className="block text-[11px] text-red-500">telat {lateDays} hari</span>
                 ) : null}
+              </TableCell>
+              <TableCell className="align-top">
+                <p
+                  className={
+                    order.notes
+                      ? "line-clamp-2 whitespace-pre-line text-[12px] leading-snug text-muted-foreground"
+                      : "text-[12px] italic text-muted-foreground/50"
+                  }
+                  title={order.notes ?? undefined}
+                >
+                  {order.notes ?? "—"}
+                </p>
               </TableCell>
               <TableCell className="overflow-hidden align-top">
                 <SourceBadge

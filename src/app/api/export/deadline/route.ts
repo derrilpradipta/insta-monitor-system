@@ -65,15 +65,15 @@ export async function GET(request: Request) {
   const sheet = workbook.addWorksheet("Deadline");
 
   const title = from === to ? `Tenggat ${formatDateId(from)}` : `Tenggat ${formatDateId(from)} – ${formatDateId(to)}`;
-  sheet.mergeCells("A1:G1");
+  sheet.mergeCells("A1:H1");
   const titleCell = sheet.getCell("A1");
   titleCell.value = `Daftar Pesanan — ${title}`;
   titleCell.font = { bold: true, size: 14 };
   titleCell.alignment = { vertical: "middle" };
 
-  sheet.mergeCells("A2:G2");
+  sheet.mergeCells("A2:H2");
   const metaCell = sheet.getCell("A2");
-  metaCell.value = `Dicetak ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB · ${orders.length} pesanan · Isi kolom "Ceklis" dengan ✓ untuk pesanan yang benar-benar sudah selesai, lalu unggah kembali file ini di halaman Deadline`;
+  metaCell.value = `Dicetak ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB · ${orders.length} pesanan · Isi kolom "Ceklis" dengan ✓ untuk pesanan yang benar-benar sudah selesai, dan kolom "Keterangan" bila perlu catatan, lalu unggah kembali file ini di halaman Deadline`;
   metaCell.font = { size: 10, color: { argb: "FF6B7280" } };
 
   const headerRow = sheet.getRow(3);
@@ -85,6 +85,7 @@ export async function GET(request: Request) {
     "Tanggal Masuk",
     "Tenggat",
     "Ceklis",
+    "Keterangan",
   ];
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.eachCell((cell) => {
@@ -103,6 +104,9 @@ export async function GET(request: Request) {
       formatDateId(order.orderDate),
       order.deadlineDate ? formatDateId(order.deadlineDate) : "Tanpa tenggat",
       null,
+      // Keterangan yang sudah tersimpan ikut terbawa, supaya file bisa
+      // diunduh ulang tanpa kehilangan catatan yang pernah diisi.
+      order.notes ?? null,
     ]);
 
     if (index % 2 === 1) {
@@ -125,9 +129,10 @@ export async function GET(request: Request) {
     { width: 14 },
     { width: 14 },
     { width: 9 },
+    { width: 40 },
   ];
   sheet.views = [{ state: "frozen", ySplit: 3 }];
-  sheet.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 7 } };
+  sheet.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 8 } };
 
   // Kolom Ceklis: dropdown berisi "✓" supaya sekali klik = tercentang.
   // (ExcelJS tidak bisa membuat form-control checkbox, jadi dropdown + conditional
@@ -181,6 +186,15 @@ export async function GET(request: Request) {
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFBEB" } };
       cell.border = {
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "hair", color: { argb: "FFE2E8F0" } },
+      };
+
+      // Kolom Keterangan: area bebas isi, ditandai kuning muda yang sama.
+      const ket = sheet.getCell(`H${row}`);
+      ket.alignment = { vertical: "top", wrapText: true };
+      ket.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFBEB" } };
+      ket.border = {
         left: { style: "thin", color: { argb: "FFE2E8F0" } },
         bottom: { style: "hair", color: { argb: "FFE2E8F0" } },
       };

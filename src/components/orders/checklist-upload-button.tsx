@@ -18,6 +18,8 @@ type ImportResult = {
   checked?: number;
   updated?: number;
   alreadyDone?: number;
+  notesSaved?: number;
+  notesCleared?: number;
   notFound?: string[];
   message?: string;
 };
@@ -25,6 +27,7 @@ type ImportResult = {
 /**
  * Unggah balik file Excel yang sudah dicentang.
  * Kolom ceklis hanya ada di Excel — di web tidak ada checkbox sama sekali.
+ * Kolom Keterangan ikut dibaca dan disimpan ke pesanan.
  */
 export function ChecklistUploadButton() {
   const router = useRouter();
@@ -78,8 +81,8 @@ export function ChecklistUploadButton() {
           <DialogTitle>Unggah ceklis dari Excel</DialogTitle>
           <DialogDescription>
             Unggah kembali file hasil <strong>Export Excel</strong> yang sudah dicentang pada kolom
-            &quot;Ceklis&quot;. Pesanan yang dicentang akan ditandai <strong>selesai</strong> di web. Baris yang tidak
-            dicentang tidak diubah.
+            &quot;Ceklis&quot;. Pesanan yang dicentang akan ditandai <strong>selesai</strong> di web, dan isi kolom
+            &quot;Keterangan&quot; ikut disimpan. Baris yang tidak dicentang tidak diubah statusnya.
           </DialogDescription>
         </DialogHeader>
 
@@ -133,6 +136,8 @@ export function ChecklistUploadButton() {
               <p className="mt-1 text-[12px] text-emerald-800">
                 Dicentang: {result.checked ?? 0} · Diubah: {result.updated ?? 0} · Sudah selesai:{" "}
                 {result.alreadyDone ?? 0}
+                {result.notesSaved ? ` · Keterangan: ${result.notesSaved}` : ""}
+                {result.notesCleared ? ` · Dikosongkan: ${result.notesCleared}` : ""}
                 {result.notFound?.length ? ` · Tidak ditemukan: ${result.notFound.length}` : ""}
               </p>
               {result.notFound?.length ? (

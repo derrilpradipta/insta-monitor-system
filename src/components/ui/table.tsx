@@ -7,7 +7,7 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
     <TableScroller>
       <table
         ref={ref}
-        className={cn("w-full min-w-[1120px] table-fixed caption-bottom text-[13px]", className)}
+        className={cn("w-full min-w-[1180px] table-fixed caption-bottom text-[13px]", className)}
         {...props}
       />
     </TableScroller>
