@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   History,
   LogOut,
+  Mail,
   Menu,
   Sparkles,
   UserRound,
@@ -22,6 +23,7 @@ import type { Role } from "@prisma/client";
 const MAIN_NAV = [{ href: "/deadline", label: "Deadline", icon: CalendarClock }];
 
 const SUPPORT_NAV = [
+  { href: "/email", label: "Email", icon: Mail },
   { href: "/monthly-review", label: "Pemeriksaan Bulanan", icon: ClipboardCheck },
   { href: "/history", label: "Riwayat Pengambilan", icon: History },
   { href: "/analysis", label: "Analisis AI", icon: Sparkles },

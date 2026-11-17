@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { prisma } from "@/lib/db";
+import { runEmailSync } from "@/lib/email/sync";
 import { closeOrphanProcesses, runDailyScrape, runMonthlyReview, syncActiveOrderStatuses } from "@/lib/sync";
 import { notifyDeadlineTomorrow, notifyOverdue, notifyStaleOrders } from "@/lib/notifications";
 import { dateOnlyToDb, shiftDateString, wibDateString, wibParts } from "@/lib/time";
@@ -161,4 +162,21 @@ export function startScheduler() {
     },
     options,
   );
+
+  // Setiap jam — ambil email yang belum dibaca.
+  // Dilewati kalau kredensial IMAP belum diisi, supaya log tidak penuh galat.
+  if (process.env.MAIL_IMAP_USER && process.env.MAIL_IMAP_PASSWORD) {
+    cron.schedule(
+      process.env.CRON_EMAIL ?? "0 * * * *",
+      async () => {
+        try {
+          const hasil = await runEmailSync("cron-internal");
+          console.log(`[cron] email: ${hasil.unreadFound} belum dibaca (${hasil.created} baru)`);
+        } catch (error) {
+          console.error("[cron] pengambilan email gagal", error);
+        }
+      },
+      options,
+    );
+  }
 }
