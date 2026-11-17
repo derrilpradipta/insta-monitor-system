@@ -24,14 +24,32 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium-min",
   ],
 
-  // Pastikan biner Chromium serverless IKUT dikemas ke fungsi yang melakukan
-  // scraping — tanpa ini, file tracing bisa membuangnya dan launch gagal.
+  // Pastikan biner Chromium serverless dan berkas data Playwright IKUT dikemas
+  // ke fungsi yang melakukan scraping.
+  //
+  // playwright-core membaca browsers.json saat modul dimuat untuk memetakan
+  // versi browser. Karena paketnya ditandai eksternal (serverExternalPackages),
+  // berkas itu tidak ikut ter-trace otomatis dan fungsi gagal dengan
+  // "Cannot find module '/var/task/node_modules/playwright-core/browsers.json'".
+  // Jadi seluruh paket Playwright disertakan eksplisit di sini.
   ...(process.env.VERCEL
     ? {
         outputFileTracingIncludes: {
-          "/api/scraper/**": ["./node_modules/@sparticuz/chromium/**"],
-          "/api/cron/**": ["./node_modules/@sparticuz/chromium/**"],
-          "/api/monthly/**": ["./node_modules/@sparticuz/chromium/**"],
+          "/api/scraper/**": [
+            "./node_modules/@sparticuz/chromium/**",
+            "./node_modules/playwright/**",
+            "./node_modules/playwright-core/**",
+          ],
+          "/api/cron/**": [
+            "./node_modules/@sparticuz/chromium/**",
+            "./node_modules/playwright/**",
+            "./node_modules/playwright-core/**",
+          ],
+          "/api/monthly/**": [
+            "./node_modules/@sparticuz/chromium/**",
+            "./node_modules/playwright/**",
+            "./node_modules/playwright-core/**",
+          ],
         },
       }
     : {}),
