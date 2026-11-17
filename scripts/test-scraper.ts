@@ -17,7 +17,7 @@ async function main() {
 
     console.log(`[2] ambil pesanan ${start} s/d ${end} (semua halaman)`);
     const rows = await client.fetchOrdersForDateRange(start, end, (info) =>
-      console.log(`    offset=${info.offset} baris=${info.rows} total=${info.total}`),
+      console.log(`    halaman=${info.page} terkumpul=${info.collected} baris-halaman=${info.pageRows}`),
     );
     console.log(`[2] total pesanan: ${rows.length}`);
 
