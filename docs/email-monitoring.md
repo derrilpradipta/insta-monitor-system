@@ -91,29 +91,46 @@ otomatis. `LABEL` hanya nama tab; kalau kosong dipakai alamat email.
 > **Penting:** header `x-project-id` wajib disertakan. Tanpa itu daftar connected
 > account terbaca kosong (0 item) meski akunnya ada.
 
-## 3. Jadwalkan tiap jam
+## 3. Jadwalkan tiap jam 08.00–23.00 WIB
 
-Vercel Hobby **tidak bisa** cron per jam: `0 * * * *` gagal saat deploy dengan
-pesan *"Hobby accounts are limited to daily cron jobs"*.
+Jadwalnya ada di `vercel.json` memakai **Vercel Schedules** (pengganti Cron
+Jobs), jadi tidak perlu layanan luar:
 
-### Opsi A — cron-job.org (gratis)
-
-1. Buat cron job di <https://cron-job.org>.
-2. URL: `https://<domain-vercel>/api/email/sync` (tanpa `?account` = semua akun).
-3. Jadwal: **Every 1 hour**
-4. Advanced → Headers: `Authorization: Bearer <EMAIL_SYNC_SECRET>`
-5. **TEST RUN** → harus membalas `{"ok":true,...}`
-
-### Opsi B — crontab VPS/PC
-
-```cron
-0 * * * * curl -s -X POST -H "x-cron-secret: $EMAIL_SYNC_SECRET" http://localhost:3000/api/email/sync
+```json
+"schedules": {
+  "email-per-jam": {
+    "schedule": "0 8-23 * * *",
+    "timezone": "Asia/Jakarta",
+    "path": "/api/email/sync",
+    "requestMethod": "POST"
+  }
+}
 ```
 
-### Opsi C — penjadwal internal (Docker/VPS)
+Artinya: 08.00, 09.00, …, 23.00 WIB (16 kali sehari), lalu berhenti sampai
+08.00 besok. Tanpa `?account`, kedua mailbox diperiksa sekaligus.
 
-Set `ENABLE_INTERNAL_CRON=1`. Job email tiap jam didaftarkan bila
-`COMPOSIO_API_KEY` dan `MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID` terisi.
+**Kenapa bukan Cron Jobs biasa?** Cron Jobs di paket Hobby dibatasi sekali
+sehari; ekspresi per jam ditolak saat deploy dengan pesan *"Hobby accounts are
+limited to daily cron jobs"*. Schedules memberi batas 15 menit di Hobby,
+sehingga per jam aman.
+
+**Presisi:** Hobby memakai jendela jitter 15 menit, jadi jadwal 08.00 bisa
+benar-benar berjalan antara 08.00–08.15. Kalau butuh tepat menit, perlu Pro
+(jitter 1 menit) atau penjadwal eksternal.
+
+Autentikasi: Vercel mengirim `Authorization: Bearer <CRON_SECRET>` otomatis.
+Route menerima **CRON_SECRET maupun EMAIL_SYNC_SECRET**, jadi penjadwal
+eksternal tetap bisa dipakai tanpa mengubah kode.
+
+### Kalau ingin di luar Vercel (opsional)
+
+```cron
+0 8-23 * * * curl -s -X POST -H "x-cron-secret: $EMAIL_SYNC_SECRET" http://localhost:3000/api/email/sync
+```
+
+Untuk Docker/VPS dengan penjadwal internal: set `ENABLE_INTERNAL_CRON=1`.
+Jadwal internal memakai ekspresi yang sama (`0 8-23 * * *`, Asia/Jakarta).
 
 ## 4. Penyegaran tampilan tiap jam
 

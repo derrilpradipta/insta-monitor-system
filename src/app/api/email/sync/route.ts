@@ -5,31 +5,27 @@ import { runEmailSync, type EmailProgress } from "@/lib/email/sync";
 export const maxDuration = 60;
 
 /**
- * Ambil email yang belum dibaca dari mailbox, lalu simpan ke database.
- *
- * Dua cara memanggil:
- *  1. Penjadwal (cron-job.org / crontab VPS) — header
- *     `Authorization: Bearer <EMAIL_SYNC_SECRET>` atau `x-cron-secret`.
- *     Kalau EMAIL_SYNC_SECRET kosong, dipakai CRON_SECRET.
- *  2. Tombol "Cek sekarang" di halaman Email — cukup sesi login.
- *
- * Parameter:
- *  - `account=<alamat>` memilih satu mailbox; tanpa ini semua akun diperiksa.
- *  - `stream=1` membalas NDJSON berisi progres per tahap, dipakai tombol
- *    "Cek sekarang" supaya bilah progres mengikuti pekerjaan yang sebenarnya.
- *
- * Membaca email TIDAK menandainya sudah dibaca: hanya metadata yang diambil.
+ * Terima dua kemungkinan secret sekaligus:
+ *  - EMAIL_SYNC_SECRET, dipakai penjadwal eksternal (cron-job.org / crontab)
+ *  - CRON_SECRET, nilai yang otomatis dikirim Vercel untuk path schedule
+ * Kalau keduanya diisi, dua-duanya berlaku.
  */
+function tokenDiterima(): string[] {
+  const daftar = [process.env.EMAIL_SYNC_SECRET, process.env.CRON_SECRET];
+  return daftar.filter((v): v is string => Boolean(v && v.length > 0));
+}
+
 async function authorize(request: Request): Promise<
   | { ok: true; pemicu: string | null }
   | { ok: false; response: Response }
 > {
-  const secret = process.env.EMAIL_SYNC_SECRET ?? process.env.CRON_SECRET ?? "";
   const headerSecret = request.headers.get("x-cron-secret");
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
 
-  if (secret && (headerSecret === secret || bearer === secret)) {
+  const kandidat = [headerSecret, bearer].filter((v): v is string => Boolean(v));
+  const sah = tokenDiterima();
+  if (sah.length > 0 && kandidat.some((v) => sah.includes(v))) {
     return { ok: true, pemicu: "penjadwal" };
   }
 
@@ -55,6 +51,23 @@ function pesanUntuk(error: unknown): { message: string; status: number } {
   };
 }
 
+/**
+ * Ambil email yang belum dibaca dari mailbox, lalu simpan ke database.
+ *
+ * Tiga cara memanggil:
+ *  1. Vercel Schedule — Vercel mengirim `Authorization: Bearer <CRON_SECRET>`.
+ *  2. Penjadwal eksternal (cron-job.org / crontab) — `x-cron-secret` atau
+ *     `Authorization: Bearer <EMAIL_SYNC_SECRET>`.
+ *  3. Tombol "Cek sekarang" di halaman Email — cukup sesi login.
+ *
+ * Parameter:
+ *  - `account=<alamat>` memilih satu mailbox; tanpa ini semua akun diperiksa.
+ *  - `stream=1` membalas NDJSON berisi progres per tahap, dipakai tombol
+ *    "Cek sekarang" supaya bilah progres mengikuti pekerjaan yang sebenarnya.
+ *
+ * Aman dipanggil berkali-kali: email dikunci dengan (akun, Message-ID).
+ * Membaca email TIDAK menandainya sudah dibaca: hanya metadata yang diambil.
+ */
 async function handle(request: Request) {
   const auth = await authorize(request);
   if (!auth.ok) return auth.response;

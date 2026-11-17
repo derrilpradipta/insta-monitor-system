@@ -163,11 +163,11 @@ export function startScheduler() {
     options,
   );
 
-  // Setiap jam — ambil email yang belum dibaca.
+  // Email: tiap jam 08.00–23.00 WIB, lalu berhenti sampai 08.00 besok.
   // Dilewati kalau kredensial Composio belum diisi, supaya log tidak penuh galat.
   if (process.env.COMPOSIO_API_KEY && process.env.MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID) {
     cron.schedule(
-      process.env.CRON_EMAIL ?? "0 * * * *",
+      process.env.CRON_EMAIL ?? "0 8-23 * * *",
       async () => {
         try {
           const { results, errors } = await runEmailSync("cron-internal");
