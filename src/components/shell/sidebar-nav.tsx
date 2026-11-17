@@ -20,10 +20,12 @@ import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/lib/labels";
 import type { Role } from "@prisma/client";
 
-const MAIN_NAV = [{ href: "/deadline", label: "Deadline", icon: CalendarClock }];
+const MAIN_NAV = [
+  { href: "/deadline", label: "Deadline", icon: CalendarClock },
+  { href: "/email", label: "Email", icon: Mail },
+];
 
 const SUPPORT_NAV = [
-  { href: "/email", label: "Email", icon: Mail },
   { href: "/monthly-review", label: "Pemeriksaan Bulanan", icon: ClipboardCheck },
   { href: "/history", label: "Riwayat Pengambilan", icon: History },
   { href: "/analysis", label: "Analisis AI", icon: Sparkles },

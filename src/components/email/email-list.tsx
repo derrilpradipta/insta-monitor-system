@@ -74,7 +74,7 @@ export function EmailList({ emails }: { emails: EmailRow[] }) {
 
       <li className="flex items-center gap-1.5 px-4 py-2.5 text-[11px] text-muted-foreground">
         <Mail className="size-3" />
-        Dibaca lewat IMAP tanpa menandai email sebagai sudah dibaca.
+        Dibaca lewat Gmail API tanpa menandai email sebagai sudah dibaca.
       </li>
     </ul>
   );

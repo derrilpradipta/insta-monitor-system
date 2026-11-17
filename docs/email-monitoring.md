@@ -1,60 +1,110 @@
 # Pemantauan Email Belum Dibaca
 
-Halaman `/email` menampilkan email yang **belum dibaca** di mailbox, diambil lewat
-IMAP. Membaca email di sini **tidak** menandai email sebagai sudah dibaca di
-mailbox asli — imapflow mengambil isi pesan dengan `BODY.PEEK[]`, yang secara
-protokol tidak mengubah flag `\Seen`.
+Halaman `/email` menampilkan email yang **belum dibaca** dari beberapa mailbox
+Gmail, diambil lewat **Composio** (Gmail API + OAuth).
 
-## Kenapa IMAP, bukan scraping webmail
+Dua hal yang membedakannya dari fitur lain:
 
-Situs Instaprint (`instasiaga.com`) tidak punya fitur email sama sekali, dan
-domainnya tidak punya MX record. Gmail juga tidak menyediakan halaman yang bisa
-di-scrape dengan aman. Jalur resmi untuk membaca email adalah IMAP.
+1. **Membaca di sini tidak menandai email sudah dibaca.** Hanya metadata yang
+   diambil. Sudah diuji: query yang sama dijalankan dua kali, semua pesan tetap
+   berlabel `UNREAD`.
+2. **Riwayatnya terpisah** dari riwayat pengambilan data pesanan. Ada di
+   `/email/riwayat`, bukan di `/history`.
 
-## 1. Siapkan App Password Gmail
+## Kenapa Composio, bukan IMAP
 
-Password akun Google biasa **akan ditolak** oleh IMAP. Yang dipakai adalah App
-Password 16 karakter:
+Situs Instaprint tidak punya fitur email, dan domainnya tidak punya MX record.
+Jalur IMAP butuh App Password 16 karakter dan gagal kalau admin Google Workspace
+mematikan akses IMAP. Composio memakai OAuth: sekali klik "Connect Gmail", tanpa
+menyentuh password.
 
-1. Aktifkan verifikasi 2 langkah di akun Google yang mau dipantau.
-2. Buka <https://myaccount.google.com/apppasswords>.
-3. Buat App Password baru (nama bebas, mis. `Instaprint Monitor`).
-4. Salin 16 karakter yang muncul — hanya ditampilkan sekali.
+Data email memang melewati server Composio. Kalau nanti ingin sepenuhnya lokal,
+hanya `src/lib/email/composio.ts` yang perlu diganti.
 
-Untuk Google Workspace, pastikan admin mengizinkan IMAP
-(Admin Console → Apps → Google Workspace → Gmail → End User Access).
+## 1. Hubungkan tiap mailbox
 
-## 2. Isi environment
+Pasang CLI sekali:
 
-Tambahkan ke `.env` (lokal) **dan** ke Environment Variables Vercel:
-
-```dotenv
-MAIL_IMAP_HOST="imap.gmail.com"
-MAIL_IMAP_PORT="993"
-MAIL_IMAP_SECURE="true"
-MAIL_IMAP_USER="akun@domain.com"
-MAIL_IMAP_PASSWORD="abcdefghijklmnop"   # App Password 16 karakter
-EMAIL_SYNC_SECRET="..."                  # opsional; kosong = pakai CRON_SECRET
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/ComposioHQ/composio/next/install.ps1 | iex
 ```
 
-Kalau kredensial belum diisi, halaman tetap terbuka dan menampilkan pesan
-"Kredensial email belum diatur di server." — aplikasi tidak rusak.
+```bash
+# Linux / macOS / WSL
+curl -fsSL https://composio.dev/install | sh
+```
+
+> Di Git Bash/MSYS installer menolak jalan. Pakai PowerShell atau WSL.
+
+Login, lalu sambungkan Gmail:
+
+```bash
+composio login            # buka URL yang muncul
+composio login --poll     # jalankan setelah login di browser selesai
+
+# Mailbox pertama
+composio link gmail
+
+# Mailbox kedua dan seterusnya WAJIB pakai --alias
+composio link gmail --alias onlineorder
+
+# Cek hasilnya
+composio link gmail --list
+```
+
+Status harus **ACTIVE**. Kalau `EXPIRED`, sambungkan ulang.
+
+## 2. Ambil nilai environment
+
+```bash
+# API key
+python -c "import json;print(json.load(open('$HOME/.composio/user_data.json'))['api_key'])"
+
+# projectId dan consumerUserId
+python -c "import json;e=list(json.load(open('$HOME/.composio/tool-permissions-cache.json'))['entries'].values())[0];print(e['projectId']);print(e['consumerUserId'])"
+```
+
+ID tiap akun Gmail (`ca_...`) dari `composio link gmail --list`.
+
+Isi `.env` **dan** Environment Variables Vercel:
+
+```dotenv
+COMPOSIO_API_KEY="uak_..."
+COMPOSIO_PROJECT_ID="pr_..."
+COMPOSIO_USER_ID="consumer-..."
+
+MAIL_ACCOUNT_1_EMAIL="instaprint24@gmail.com"
+MAIL_ACCOUNT_1_LABEL="Instaprint Pusat"
+MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID="ca_..."
+
+MAIL_ACCOUNT_2_EMAIL="onlineorder@instaprint8.com"
+MAIL_ACCOUNT_2_LABEL="Online Order"
+MAIL_ACCOUNT_2_CONNECTED_ACCOUNT_ID="ca_..."
+
+EMAIL_SYNC_SECRET="..."          # opsional; kosong = pakai CRON_SECRET
+```
+
+Menambah mailbox = tambah pasangan `MAIL_ACCOUNT_3_*`, lalu tab baru muncul
+otomatis. `LABEL` hanya nama tab; kalau kosong dipakai alamat email.
+
+> **Penting:** header `x-project-id` wajib disertakan. Tanpa itu daftar connected
+> account terbaca kosong (0 item) meski akunnya ada.
 
 ## 3. Jadwalkan tiap jam
 
-### Opsi A — cron-job.org (gratis, tanpa upgrade Vercel)
+Vercel Hobby **tidak bisa** cron per jam: `0 * * * *` gagal saat deploy dengan
+pesan *"Hobby accounts are limited to daily cron jobs"*.
 
-Vercel Hobby **tidak bisa** cron per jam: ekspresi seperti `0 * * * *` gagal saat
-deploy dengan pesan *"Hobby accounts are limited to daily cron jobs"*.
+### Opsi A — cron-job.org (gratis)
 
-1. Daftar di <https://cron-job.org> lalu buat cron job baru.
-2. URL: `https://<domain-vercel>/api/email/sync?job=email`
-3. Jadwal: **Every 1 hour**.
-4. Tab Advanced → Headers, tambahkan:
-   - `Authorization: Bearer <EMAIL_SYNC_SECRET>`
-5. Simpan, lalu tekan **TEST RUN** untuk memastikan balasannya `{"ok":true,...}`.
+1. Buat cron job di <https://cron-job.org>.
+2. URL: `https://<domain-vercel>/api/email/sync` (tanpa `?account` = semua akun).
+3. Jadwal: **Every 1 hour**
+4. Advanced → Headers: `Authorization: Bearer <EMAIL_SYNC_SECRET>`
+5. **TEST RUN** → harus membalas `{"ok":true,...}`
 
-### Opsi B — crontab VPS / PC yang menyala 24 jam
+### Opsi B — crontab VPS/PC
 
 ```cron
 0 * * * * curl -s -X POST -H "x-cron-secret: $EMAIL_SYNC_SECRET" http://localhost:3000/api/email/sync
@@ -62,41 +112,131 @@ deploy dengan pesan *"Hobby accounts are limited to daily cron jobs"*.
 
 ### Opsi C — penjadwal internal (Docker/VPS)
 
-Set `ENABLE_INTERNAL_CRON=1`. Penjadwal di `src/lib/scheduler.ts` otomatis
-menambahkan job email tiap jam **hanya jika** `MAIL_IMAP_USER` dan
-`MAIL_IMAP_PASSWORD` terisi.
+Set `ENABLE_INTERNAL_CRON=1`. Job email tiap jam didaftarkan bila
+`COMPOSIO_API_KEY` dan `MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID` terisi.
 
 ## 4. Penyegaran tampilan tiap jam
 
-Halaman `/email` menyegarkan dirinya sendiri setiap jam lewat `router.refresh()`.
-Itu hanya memperbarui **tampilan**; pengambilan data tetap tugas penjadwal di
-atas, supaya data tetap terisi walau tidak ada tab yang terbuka. Penyegaran
-dilewati saat tab tidak terlihat, dan dilakukan sekali saat tab kembali dibuka
-bila sudah lewat satu jam.
+Halaman menyegarkan dirinya sendiri tiap jam lewat `router.refresh()`. Itu hanya
+memperbarui **tampilan**; pengambilan tetap tugas penjadwal di server, supaya
+data terisi walau tidak ada tab terbuka. Penyegaran dilewati saat tab tidak
+terlihat, dan dijalankan sekali saat tab kembali dibuka bila sudah lewat sejam.
 
-## Cara kerja pengambilan
+## Laporan Excel
+
+Tombol **Excel** mengunduh SATU file `.xlsx` yang memuat **semua mailbox
+sekaligus**, apa pun tab yang sedang dibuka. Alasannya: laporan ini untuk
+atasan, jadi tidak perlu mengunduh satu per akun.
+
+Susunan file:
+
+```
+Baris 1  Laporan Email — Semua Akun
+Baris 2  Dicetak … WIB · Email belum dibaca · 15 email
+         · Instaprint Pusat: 8 · Online Order: 7
+Baris 3  Instaprint Pusat — instaprint24@gmail.com (8 email)
+Baris 4  header kolom
+Baris 5+ 8 email akun pertama
+(baris kosong)
+         Online Order — onlineorder@instaprint8.com (7 email)
+         header kolom
+         7 email akun kedua
+```
+
+Tiap akun punya subjudul sendiri (latar biru muda) dan header kolom diulang,
+jadi tiap bagian terbaca mandiri. Nomor urut jalan terus lintas akun.
+
+Kolom: No, Akun, Pengirim, Alamat Email, Subjek, Cuplikan, Waktu Masuk,
+Lampiran, Status.
+
+Isi mengikuti tab yang aktif: **Belum dibaca** (bawaan) atau **Semua**.
+Endpoint: `GET /api/export/email?filter=belum|semua`.
+
+## Progres pengecekan nyata
+
+Tombol **Cek sekarang** membuka dialog yang memanggil
+`POST /api/email/sync?account=...&stream=1`. Server membalas NDJSON per tahap,
+sama seperti tombol "Ambil data" pada pesanan:
+
+| Tahap | Angka yang dilaporkan |
+|---|---|
+| Menghubungi Gmail | — |
+| Mengambil email belum dibaca | halaman ke-N, jumlah email terkumpul |
+| Menyimpan ke database | email ke-N dari total |
+| Menyelaraskan status dibaca | jumlah yang dikeluarkan |
+
+Persentase dihitung dari angka-angka itu dan tidak pernah mundur. Tidak ada
+bagian yang ditebak; satu-satunya yang berjalan sendiri adalah penghitung detik.
+
+## Daftar bersifat dinamis, bukan akumulatif
+
+Setiap pengecekan membandingkan isi database dengan daftar UNREAD di Gmail:
+
+- email yang **masih** belum dibaca → tetap di daftar
+- email yang **sudah dibaca** di Gmail → ditandai `isRead`, keluar dari daftar
+- email **baru** yang belum dibaca → masuk
+
+Penyelarasan ini hanya berjalan kalau pengambilan tidak terpotong batas 500
+email, supaya email di luar jangkauan tidak salah dianggap sudah dibaca.
+
+Dibuktikan dengan menyisipkan satu baris uji yang tidak ada di Gmail: setelah
+sync, baris itu berubah jadi `isRead = true` dan jumlah belum-dibaca kembali
+sama dengan angka nyata di Gmail.
+
+## Posisi menu
+
+Email ada di **Menu utama** (bersama Deadline), bukan di Pendukung. Riwayat
+pengecekan email tetap terpisah di `/email/riwayat`.
+
+## Struktur kode
+
+```
+src/lib/email/accounts.ts   ← daftar mailbox dari environment
+src/lib/email/composio.ts   ← satu-satunya yang bicara ke Composio
+src/lib/email/sync.ts       ← simpan ke DB, selaraskan status dibaca
+src/app/api/email/sync      ← endpoint penjadwal (?account= untuk satu akun)
+src/app/(dashboard)/email           ← halaman dengan tab per akun
+src/app/(dashboard)/email/riwayat   ← riwayat pengecekan (terpisah)
+src/app/api/export/email            ← laporan .xlsx
+src/components/email/email-sync-controls.tsx  ← dialog progres nyata
+```
+
+`sync.ts` hanya memakai antarmuka `connect()`, `fetchUnread()`, `close()` dari
+`composio.ts`, jadi sumber data bisa diganti tanpa menyentuh sisanya.
+
+## Cara kerja
 
 ```
 penjadwal (tiap jam)
       ↓  POST /api/email/sync  (+ secret)
-IMAP: SEARCH seen:false  →  FETCH BODY.PEEK[]
+untuk setiap akun: Composio → Gmail API "is:unread in:inbox"
       ↓
-simpan ke tabel email_messages (kunci: Message-ID)
+simpan ke email_messages (unik: account_email + message_id)
       ↓
-halaman /email membaca database
+halaman /email membaca database, difilter per akun
 ```
 
-- **Tidak menggandakan**: `message_id` unik; sync berikutnya memperbarui.
-- **Status dibaca diselaraskan**: email yang dulu belum dibaca lalu dibaca di HP
-  akan berubah jadi "sudah dibaca" di sini.
-- **Tidak menandai dibaca**: pengambilan memakai `BODY.PEEK[]`.
-- **Tercatat**: setiap proses masuk tabel `email_sync_runs` (berhasil/gagal,
-  berapa ditemukan/baru/ditandai dibaca).
+- **Tidak menggandakan**: kunci unik gabungan akun + Message-ID.
+- **Tidak tercampur**: tiap baris menyimpan `account_email`.
+- **Satu akun gagal tidak menghentikan akun lain**; kegagalan dilaporkan
+  per akun di `email_sync_runs`.
+- **Status dibaca diselaraskan**: email yang dibaca di HP hilang dari daftar
+  belum-dibaca pada sync berikutnya.
+
+## Jebakan yang sudah ditangani
+
+| Jebakan | Penanganan |
+|---|---|
+| `max_results` default **1** → hanya dapat satu email | selalu diisi eksplisit |
+| `nextPageToken` bisa `''` (string kosong) | hanya token berisi dianggap lanjut |
+| Tanpa `x-project-id` daftar akun terbaca 0 | header selalu dikirim |
+| Akun kedua ditolak tanpa `--alias` | didokumentasikan di langkah 1 |
+| `sender` berbentuk `Nama <alamat>` | dipecah jadi nama + alamat |
+| Kredensial kosong meninggalkan run RUNNING | pembaca dibuat di dalam `try` |
 
 ## Batasan
 
-- Hanya folder `INBOX` yang dipantau (bisa dikembangkan).
-- Isi lengkap email tidak disimpan — hanya cuplikan ~300 karakter, demi privasi
-  dan ukuran database.
-- Lampiran hanya dicatat keberadaannya (ikon klip), isinya tidak diunduh.
-- Gmail membatasi IMAP untuk akun dengan 2FA tanpa App Password.
+- Hanya `in:inbox` yang dipantau.
+- Isi lengkap tidak disimpan — hanya cuplikan ~300 karakter.
+- Lampiran hanya ditandai keberadaannya, isinya tidak diunduh.
+- Kuota Composio Hobby: 100.000 panggilan/bulan. Dua akun per jam ≈ 1.440/bulan.

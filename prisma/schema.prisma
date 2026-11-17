@@ -303,13 +303,15 @@ model Notification {
 /// status belum-dibaca di mailbox asli.
 model EmailMessage {
   id             String   @id @default(cuid())
+  /// Alamat email pemilik pesan ini (membedakan antar-mailbox).
+  accountEmail   String   @map("account_email")
   /// Folder asal, mis. INBOX.
   mailbox        String   @default("INBOX")
   /// UID IMAP; unik bersama uidValidity agar aman saat UIDVALIDITY berubah.
   uid            Int?
   uidValidity    BigInt?
-  /// Header Message-ID; kunci alami untuk mencegah duplikat.
-  messageId      String   @unique @map("message_id")
+  /// Header Message-ID; unik per akun agar dua mailbox tidak saling menimpa.
+  messageId      String   @map("message_id")
   fromName       String?  @map("from_name")
   fromAddress    String   @map("from_address")
   subject        String
@@ -324,14 +326,19 @@ model EmailMessage {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  @@index([receivedAt])
+  @@unique([accountEmail, messageId])
+  @@index([accountEmail, receivedAt])
   @@index([isRead, receivedAt])
   @@map("email_messages")
 }
 
 /// Catatan setiap proses pengambilan email, untuk halaman riwayat email.
+/// Terpisah dari ScrapingLog supaya riwayat order dan riwayat email tidak
+/// tercampur di satu layar.
 model EmailSyncRun {
   id           String    @id @default(cuid())
+  /// Akun mana yang diperiksa pada proses ini.
+  accountEmail String    @map("account_email")
   status       String    @default("RUNNING")
   startedAt    DateTime  @default(now()) @map("started_at")
   finishedAt   DateTime? @map("finished_at")
@@ -342,6 +349,6 @@ model EmailSyncRun {
   errorMessage String?   @map("error_message")
   triggeredBy  String?   @map("triggered_by")
 
-  @@index([startedAt])
+  @@index([accountEmail, startedAt])
   @@map("email_sync_runs")
 }

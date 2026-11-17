@@ -164,14 +164,18 @@ export function startScheduler() {
   );
 
   // Setiap jam — ambil email yang belum dibaca.
-  // Dilewati kalau kredensial IMAP belum diisi, supaya log tidak penuh galat.
-  if (process.env.MAIL_IMAP_USER && process.env.MAIL_IMAP_PASSWORD) {
+  // Dilewati kalau kredensial Composio belum diisi, supaya log tidak penuh galat.
+  if (process.env.COMPOSIO_API_KEY && process.env.MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID) {
     cron.schedule(
       process.env.CRON_EMAIL ?? "0 * * * *",
       async () => {
         try {
-          const hasil = await runEmailSync("cron-internal");
-          console.log(`[cron] email: ${hasil.unreadFound} belum dibaca (${hasil.created} baru)`);
+          const { results, errors } = await runEmailSync("cron-internal");
+          const ringkas = results
+            .map((r) => `${r.accountEmail}: ${r.unreadFound} belum dibaca (${r.created} baru)`)
+            .join(" | ");
+          console.log(`[cron] email: ${ringkas || "tidak ada akun"}`);
+          if (errors.length) console.warn("[cron] email gagal:", errors);
         } catch (error) {
           console.error("[cron] pengambilan email gagal", error);
         }
