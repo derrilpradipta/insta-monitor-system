@@ -246,7 +246,7 @@ export class InstaprintClient {
   async fetchOrdersForDateRange(
     startDate: string,
     endDate: string,
-    onPage?: (info: { offset: number; rows: number; total: number }) => void,
+    onPage?: (info: { offset: number; page: number; collected: number; pageRows: number }) => void,
   ): Promise<ScrapedOrderRow[]> {
     await this.open();
     const page = this.currentPage;
@@ -290,7 +290,12 @@ export class InstaprintClient {
         seen.add(key);
         results.push(row as ScrapedOrderRow);
       }
-      onPage?.({ offset, rows: rows.length, total: results.length });
+      onPage?.({
+        offset,
+        page: i + 1,
+        collected: results.length,
+        pageRows: rows.length,
+      });
 
       if (rows.length < PAGE_SIZE) break;
       offset += PAGE_SIZE;

@@ -243,8 +243,23 @@ export type ScrapeRunOptions = {
   fetchDetails?: boolean | "smart";
   triggeredBy?: string | null;
   retryOfId?: string | null;
-  onProgress?: (message: string) => void;
+  onProgress?: ScrapeProgressHandler;
 };
+
+/**
+ * Kabar kemajuan dari dalam proses scraping.
+ *
+ * Dikirim apa adanya ke browser lewat NDJSON stream, jadi angka yang dilihat
+ * pengguna berasal dari pekerjaan yang benar-benar sudah selesai — bukan
+ * perkiraan atau animasi.
+ */
+export type ScrapeProgress =
+  | { stage: "login"; message: string }
+  | { stage: "list"; message: string; page: number; collected: number }
+  | { stage: "detail"; message: string; done: number; total: number }
+  | { stage: "save"; message: string };
+
+export type ScrapeProgressHandler = (progress: ScrapeProgress) => void;
 
 /** Jalankan satu proses scraping lengkap: login -> daftar -> detail -> simpan -> log. */
 export async function runScrape(options: ScrapeRunOptions): Promise<{ logId: string; result: UpsertResult }> {
@@ -276,12 +291,22 @@ export async function runScrape(options: ScrapeRunOptions): Promise<{ logId: str
   const errors: string[] = [];
 
   try {
-    onProgress?.("Login ke website sumber");
+    onProgress?.({ stage: "login", message: "Login ke website sumber" });
     await client.login();
 
-    onProgress?.(`Mengambil daftar pesanan ${startDate} s/d ${endDate}`);
+    onProgress?.({
+      stage: "list",
+      message: `Mengambil daftar pesanan ${startDate} s/d ${endDate}`,
+      page: 0,
+      collected: 0,
+    });
     const rows = await client.fetchOrdersForDateRange(startDate, endDate, (info) =>
-      onProgress?.(`Halaman offset ${info.offset}: ${info.rows} baris (total ${info.total})`),
+      onProgress?.({
+        stage: "list",
+        message: "Mengambil daftar pesanan",
+        page: info.page,
+        collected: info.collected,
+      }),
     );
     found = rows.length;
 
@@ -300,6 +325,18 @@ export async function runScrape(options: ScrapeRunOptions): Promise<{ logId: str
     }
 
     let detailFetched = 0;
+
+    // Umumkan tahap detail sejak awal supaya bilah progres langsung berpindah
+    // ke tahap ini, bukan menunggu lima pesanan pertama selesai.
+    if (rows.length > 0) {
+      onProgress?.({
+        stage: "detail",
+        message: "Mengambil detail tenggat pesanan",
+        done: 0,
+        total: rows.length,
+      });
+    }
+
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i]!;
       let needsDetail = fetchDetails === true;
@@ -320,13 +357,24 @@ export async function runScrape(options: ScrapeRunOptions): Promise<{ logId: str
       const item = prepareOrder(row, detail, baseUrl);
       if (item) prepared.push(item);
       else failed += 1;
-      if (detailFetched > 0 && detailFetched % 10 === 0) {
-        onProgress?.(`Mengambil detail ${detailFetched} pesanan (${i + 1}/${rows.length} diproses)`);
+
+      // Kabar kemajuan per pesanan yang sudah selesai diproses, supaya bilah
+      // progres bisa bergerak berdasarkan pekerjaan nyata.
+      if ((i + 1) % 5 === 0 || i + 1 === rows.length) {
+        onProgress?.({
+          stage: "detail",
+          message: "Mengambil detail pesanan",
+          done: i + 1,
+          total: rows.length,
+        });
       }
     }
-    onProgress?.(`${detailFetched} halaman detail dibuka dari ${rows.length} pesanan`);
+    onProgress?.({
+      stage: "save",
+      message: `${detailFetched} halaman detail dibuka dari ${rows.length} pesanan`,
+    });
 
-    onProgress?.("Menyimpan ke database");
+    onProgress?.({ stage: "save", message: "Menyimpan ke database" });
     const upsert = await upsertOrders(prepared, { logId: log.id });
     created = upsert.created;
     updated = upsert.updated;
@@ -469,7 +517,11 @@ export async function closeOrphanProcesses(): Promise<number> {
 }
 
 /** Jalankan pengambilan harian untuk tanggal yang diberikan (default kemarin WIB). */
-export async function runDailyScrape(targetDate?: string, triggeredBy: string | null = null) {
+export async function runDailyScrape(
+  targetDate?: string,
+  triggeredBy: string | null = null,
+  onProgress?: ScrapeProgressHandler,
+) {
   const date = targetDate ?? wibDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
   return runScrape({
     startDate: date,
@@ -477,6 +529,7 @@ export async function runDailyScrape(targetDate?: string, triggeredBy: string | 
     processType: "DAILY_SCRAPE",
     fetchDetails: "smart",
     triggeredBy,
+    onProgress,
   });
 }
 
