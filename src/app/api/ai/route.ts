@@ -12,8 +12,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Sesi berakhir." }, { status: 401 });
   }
 
+  // Batas ukuran body (OWASP A04 Insecure Design): pertanyaan panjang tidak
+  // berguna dan hanya membebani model. 4 KB jauh lebih dari cukup.
+  const panjang = Number(request.headers.get("content-length") ?? 0);
+  if (panjang > 4096) {
+    return NextResponse.json({ ok: false, message: "Pertanyaan terlalu panjang." }, { status: 413 });
+  }
+
   const body = (await request.json().catch(() => ({}))) as { question?: string };
-  const question = (body.question ?? "").slice(0, 1000);
+  const question = String(body.question ?? "").slice(0, 1000);
 
   const result = await askOperationalAi(question);
 

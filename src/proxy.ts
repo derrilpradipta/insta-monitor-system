@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PROTECTED_PREFIXES = [
   "/orders",
   "/deadline",
+  "/email",
   "/monthly-review",
   "/history",
   "/notifications",

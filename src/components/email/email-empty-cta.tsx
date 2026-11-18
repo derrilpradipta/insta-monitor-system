@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-/** Tombol "Cek sekarang" untuk keadaan kosong, khusus satu akun. */
-export function EmailEmptyCta({ account }: { account: string }) {
+/** Tombol "Cek sekarang" untuk keadaan kosong — memeriksa semua mailbox. */
+export function EmailEmptyCta() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function EmailEmptyCta({ account }: { account: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/email/sync?account=${encodeURIComponent(account)}`, { method: "POST" });
+        const res = await fetch("/api/email/sync", { method: "POST" });
         const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
         if (!res.ok || !data.ok) {
           setError(data.message ?? "Terjadi kesalahan pada server. Silakan coba lagi.");

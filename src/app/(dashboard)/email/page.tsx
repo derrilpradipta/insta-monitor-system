@@ -133,7 +133,10 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             <Download className="size-4" />
             Excel
           </a>
-          <EmailSyncControls account={akunAktif.email} label={akunAktif.label} />
+          {/* Satu tombol untuk semua mailbox: tidak perlu pindah tab dulu. */}
+          <EmailSyncControls
+            accounts={akunTersedia.map((a) => ({ email: a.email, label: a.label }))}
+          />
         </div>
       </PageHeader>
 
@@ -221,7 +224,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             <EmptyState
               title="Belum ada data email"
               description="Tekan Cek sekarang untuk mengambil email yang belum dibaca. Membaca di sini tidak menandai email sebagai sudah dibaca."
-              action={<EmailEmptyCta account={akunAktif.email} />}
+              action={<EmailEmptyCta />}
             />
           )
         ) : (

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { guardApi, ditolak } from "@/lib/api-guard";
 import { runMonthlyReview } from "@/lib/sync";
 import { logActivity } from "@/lib/activity";
 
@@ -7,10 +7,8 @@ export const maxDuration = 300;  // batas maksimum Vercel Hobby; Docker/VPS bisa
 
 /** Jalankan pemeriksaan bulanan (butuh login). */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ ok: false, message: "Sesi berakhir." }, { status: 401 });
-  }
+  const session = await guardApi(["ADMIN", "PIMPINAN"]);
+  if (ditolak(session)) return session;
 
   const body = (await request.json().catch(() => ({}))) as { year?: number; month?: number };
   const now = new Date(Date.now() + 7 * 3600_000);

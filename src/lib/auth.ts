@@ -32,6 +32,78 @@ export type AuthFailure = {
 
 export type AuthSuccess = { ok: true; user: SessionUser };
 
+/** Aturan kekuatan password (OWASP A07). */
+export type PasswordCheck = { ok: true } | { ok: false; message: string };
+
+const PASSWORD_MIN = 12;
+const PASSWORD_MAX = 128; // batas atas agar tidak jadi vektor DoS pada bcrypt
+
+const LEMAH = [
+  "password",
+  "123456",
+  "qwerty",
+  "admin",
+  "instaprint",
+  "monitoring",
+  "rahasia",
+  "12345678",
+  "password1",
+  "administrator",
+];
+
+/**
+ * Validasi kekuatan password baru.
+ *
+ * Aturannya mengikuti saran OWASP: panjang minimal 12 karakter (panjang lebih
+ * efektif daripada aturan simbol wajib), tolak password yang terlalu umum,
+ * tolak pengulangan karakter dan urutan berurutan, serta tolak password yang
+ * sama dengan nama/email pengguna.
+ */
+export function checkPasswordStrength(
+  password: string,
+  konteks: { email?: string | null; name?: string | null } = {},
+): PasswordCheck {
+  if (password.length < PASSWORD_MIN) {
+    return { ok: false, message: `Password minimal ${PASSWORD_MIN} karakter.` };
+  }
+  if (password.length > PASSWORD_MAX) {
+    return { ok: false, message: `Password maksimal ${PASSWORD_MAX} karakter.` };
+  }
+
+  const kecil = password.toLowerCase();
+
+  if (LEMAH.some((kata) => kecil.includes(kata))) {
+    return { ok: false, message: "Password terlalu mudah ditebak. Hindari kata umum seperti nama aplikasi atau 'password'." };
+  }
+
+  // Karakter yang sama diulang 4 kali atau lebih (mis. "aaaa", "1111").
+  if (/(.)\1{3,}/.test(password)) {
+    return { ok: false, message: "Password tidak boleh berisi karakter yang sama berulang." };
+  }
+
+  // Urutan berurutan (mis. "abcd", "4321").
+  if (/(abcdefghijklmnopqrstuvwxyz|0123456789)/.test(kecil) || /(zyxwvutsrqponmlkjihgfedcba|9876543210)/.test(kecil)) {
+    return { ok: false, message: "Password tidak boleh berisi urutan karakter berurutan." };
+  }
+
+  // Harus ada campuran: minimal dua jenis dari huruf kecil, huruf besar, angka, simbol.
+  const jenis = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(password)).length;
+  if (jenis < 2) {
+    return { ok: false, message: "Gunakan campuran huruf besar/kecil, angka, atau simbol." };
+  }
+
+  // Jangan memakai nama atau email sendiri.
+  const bagianKonteks = [konteks.email?.split("@")[0], konteks.name]
+    .filter((v): v is string => Boolean(v && v.length >= 4))
+    .map((v) => v.toLowerCase().replace(/\s+/g, ""));
+
+  if (bagianKonteks.some((v) => kecil.replace(/\s+/g, "").includes(v))) {
+    return { ok: false, message: "Password tidak boleh berisi nama atau email Anda sendiri." };
+  }
+
+  return { ok: true };
+}
+
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import {
+  checkPasswordStrength,
   authenticate,
   createSession,
   destroyCurrentSession,
@@ -116,7 +117,8 @@ export async function changePasswordAction(
   const confirm = String(formData.get("confirmPassword") ?? "");
 
   if (!current || !next || !confirm) return { error: "Semua kolom wajib diisi." };
-  if (next.length < 8) return { error: "Password baru minimal 8 karakter." };
+  const kuat = checkPasswordStrength(next, { email: session.user.email, name: session.user.name });
+  if (!kuat.ok) return { error: kuat.message };
   if (next !== confirm) return { error: "Konfirmasi password tidak sama." };
   if (next === current) return { error: "Password baru harus berbeda dari password lama." };
 

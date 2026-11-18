@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { guardApi, ditolak } from "@/lib/api-guard";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
-import { getSession, getClientIp } from "@/lib/auth";
+import { getClientIp } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -68,10 +69,8 @@ type Baris = {
  * Query: `dryRun=1` untuk pratinjau tanpa menyimpan.
  */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ ok: false, message: "Sesi berakhir. Silakan login ulang." }, { status: 401 });
-  }
+  const session = await guardApi(["ADMIN", "PIMPINAN"]);
+  if (ditolak(session)) return session;
 
   const url = new URL(request.url);
   const dryRun = url.searchParams.get("dryRun") === "1";

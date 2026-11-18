@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-type Stage = "connect" | "fetch" | "save" | "reconcile" | "selesai";
+type Stage = "connect" | "fetch" | "save" | "reconcile" | "selesai" | "wait";
 
 type ProgressEvent =
   | { type: "progress"; stage: "connect"; message: string; account: string }
@@ -24,39 +24,94 @@ type ProgressEvent =
   | {
       type: "done";
       ok: true;
-      results: { accountEmail: string; unreadFound: number; created: number; updated: number; markedRead: number }[];
+      results: {
+        accountEmail: string;
+        unreadFound: number;
+        created: number;
+        updated: number;
+        markedRead: number;
+      }[];
     }
   | { type: "error"; ok: false; message: string };
 
-const STEPS: { key: Exclude<Stage, "selesai">; label: string }[] = [
-  { key: "connect", label: "Menghubungi Gmail" },
-  { key: "fetch", label: "Mengambil email belum dibaca" },
-  { key: "save", label: "Menyimpan ke database" },
-  { key: "reconcile", label: "Menyelaraskan status dibaca" },
-];
+const STAGE_TEXT: Record<"connect" | "fetch" | "save" | "reconcile", string> = {
+  connect: "Menghubungi Gmail",
+  fetch: "Mengambil email belum dibaca",
+  save: "Menyimpan ke database",
+  reconcile: "Menyelaraskan status dibaca",
+};
 
-const ORDER: Record<Stage, number> = { connect: 0, fetch: 1, save: 2, reconcile: 3, selesai: 4 };
+type AkunState = {
+  email: string;
+  label: string;
+  stage: Stage;
+  note: string;
+  fetch: { page: number; collected: number } | null;
+  save: { done: number; total: number } | null;
+  result: { unreadFound: number; created: number; updated: number; markedRead: number } | null;
+};
+
+/** Keadaan awal: semua akun menunggu. */
+function kosong(accounts: { email: string; label: string }[]): AkunState[] {
+  return accounts.map((a) => ({
+    email: a.email,
+    label: a.label,
+    stage: "wait" as Stage,
+    note: "",
+    fetch: null,
+    save: null,
+    result: null,
+  }));
+}
+
+/** Kemajuan satu akun pada skala 0–100. */
+function persenAkun(a: AkunState): number {
+  if (a.stage === "selesai") return 100;
+  if (a.stage === "wait") return 0;
+  if (a.stage === "connect") return 5;
+  if (a.stage === "fetch") {
+    const terkumpul = a.fetch?.collected ?? 0;
+    return 8 + 52 * (1 - Math.exp(-terkumpul / 12));
+  }
+  if (a.stage === "save") {
+    return a.save && a.save.total > 0 ? 62 + (a.save.done / a.save.total) * 30 : 62;
+  }
+  return 96;
+}
+
+/** Terapkan satu event progres ke akun yang bersangkutan. */
+function tandaiProgress(prev: AkunState[], event: Extract<ProgressEvent, { type: "progress" }>): AkunState[] {
+  return prev.map((a) => {
+    if (a.email !== event.account) return a;
+    return {
+      ...a,
+      stage: event.stage,
+      note: event.message,
+      fetch: event.stage === "fetch" ? { page: event.page, collected: event.collected } : a.fetch,
+      save: event.stage === "save" ? { done: event.done, total: event.total } : a.save,
+    };
+  });
+}
 
 /**
  * Tombol pengecekan email dengan progres NYATA.
  *
- * Angka di bilah progres berasal dari server: halaman Gmail yang benar-benar
+ * SELALU memeriksa semua mailbox sekaligus dalam satu proses — tidak perlu
+ * berpindah tab dulu. Karena server memprosesnya berurutan, dialog menampilkan
+ * akun mana yang sedang dikerjakan beserta angkanya masing-masing.
+ *
+ * Angka di bilir progres berasal dari server: halaman Gmail yang benar-benar
  * sudah terbaca dan email yang benar-benar sudah tersimpan. Server mengirim
  * NDJSON per tahap (sama seperti tombol "Ambil data" pada pesanan), jadi tidak
  * ada persentase karangan.
  */
-export function EmailSyncControls({ account, label }: { account: string; label: string }) {
+export function EmailSyncControls({ accounts }: { accounts: { email: string; label: string }[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [stage, setStage] = useState<Stage>("connect");
-  const [note, setNote] = useState("");
-  const [fetchInfo, setFetchInfo] = useState<{ page: number; collected: number } | null>(null);
-  const [saveInfo, setSaveInfo] = useState<{ done: number; total: number } | null>(null);
+  const [akun, setAkun] = useState<AkunState[]>(() => kosong(accounts));
   const [elapsed, setElapsed] = useState(0);
-  const [summary, setSummary] = useState<string | null>(null);
 
   const startedAt = useRef<number | null>(null);
 
@@ -70,12 +125,8 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
 
   const reset = () => {
     setError(null);
-    setStage("connect");
-    setNote("");
-    setFetchInfo(null);
-    setSaveInfo(null);
+    setAkun(kosong(accounts));
     setElapsed(0);
-    setSummary(null);
     startedAt.current = null;
   };
 
@@ -85,10 +136,8 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
     startedAt.current = Date.now();
 
     try {
-      const response = await fetch(
-        `/api/email/sync?account=${encodeURIComponent(account)}&stream=1`,
-        { method: "POST" },
-      );
+      // Tanpa ?account → server memeriksa SEMUA mailbox secara berurutan.
+      const response = await fetch("/api/email/sync?stream=1", { method: "POST" });
 
       if (!response.ok || !response.body) {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
@@ -123,22 +172,32 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
           }
 
           if (event.type === "progress") {
-            setStage(event.stage);
-            setNote(event.message);
-            if (event.stage === "fetch") setFetchInfo({ page: event.page, collected: event.collected });
-            if (event.stage === "save") setSaveInfo({ done: event.done, total: event.total });
+            setAkun((prev) => tandaiProgress(prev, event));
           } else if (event.type === "done") {
             selesai = true;
-            setStage("selesai");
-            setNote("");
+            setAkun((prev) =>
+              prev.map((a) => {
+                const hasil = event.results.find((r) => r.accountEmail === a.email);
+                return {
+                  ...a,
+                  stage: "selesai" as Stage,
+                  note: "",
+                  result: hasil
+                    ? {
+                        unreadFound: hasil.unreadFound,
+                        created: hasil.created,
+                        updated: hasil.updated,
+                        markedRead: hasil.markedRead,
+                      }
+                    : a.result,
+                };
+              }),
+            );
 
-            const r = event.results[0];
-            if (r) {
-              const bagian = [`${r.unreadFound} belum dibaca`];
-              if (r.created) bagian.push(`${r.created} baru`);
-              if (r.markedRead) bagian.push(`${r.markedRead} sudah dibaca, dikeluarkan`);
-              bagian.push(`total tersimpan ${r.unreadFound}`);
-              setSummary(bagian.join(" · "));
+            // Akun yang tidak muncul di hasil berarti gagal diproses.
+            const gagalAkun = accounts.filter((a) => !event.results.some((r) => r.accountEmail === a.email));
+            if (gagalAkun.length > 0) {
+              setError(`${gagalAkun.map((a) => a.label).join(", ")} gagal diperiksa. Coba lagi nanti.`);
             }
           } else if (event.type === "error") {
             gagal = true;
@@ -159,30 +218,15 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
     }
   };
 
-  // Persentase dari kemajuan nyata; tidak pernah mundur.
-  let percent = 0;
-  if (stage === "connect") percent = 4;
-  else if (stage === "fetch") {
-    // Jumlah email belum dibaca tidak diketahui sebelum selesai, jadi kurvanya
-    // melandai: makin banyak terkumpul, makin dekat ke 60%.
-    const collected = fetchInfo?.collected ?? 0;
-    percent = 8 + 52 * (1 - Math.exp(-collected / 12));
-  } else if (stage === "save") {
-    percent = saveInfo && saveInfo.total > 0 ? 62 + (saveInfo.done / saveInfo.total) * 30 : 62;
-  } else if (stage === "reconcile") percent = 96;
-  else if (stage === "selesai") percent = 100;
-
+  // Persentase keseluruhan: rata-rata kemajuan tiap akun. Rata-rata membuat
+  // bilahnya bergerak mulus saat berpindah dari akun pertama ke berikutnya.
+  const percent = akun.length === 0 ? 0 : akun.reduce((n, a) => n + persenAkun(a), 0) / akun.length;
   const peak = useRef(0);
   if (percent > peak.current) peak.current = percent;
   const shownPercent = Math.round(peak.current);
 
-  const currentIndex = ORDER[stage];
-  const stepState = (index: number): "done" | "active" | "wait" => {
-    if (stage === "selesai") return "done";
-    if (index < currentIndex) return "done";
-    if (index === currentIndex) return "active";
-    return "wait";
-  };
+  const semuaSelesai = akun.length > 0 && akun.every((a) => a.stage === "selesai");
+  const aktif = akun.find((a) => a.stage !== "selesai" && a.stage !== "wait");
 
   return (
     <Dialog
@@ -201,87 +245,101 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
         <DialogHeader>
           <DialogTitle>Cek email belum dibaca</DialogTitle>
           <DialogDescription>
-            Mengambil email yang belum dibaca dari <span className="font-medium text-foreground">{label}</span> lewat
-            Gmail API. Membaca di sini <span className="font-medium text-foreground">tidak</span> menandai email sebagai
-            sudah dibaca di Gmail.
+            Memeriksa <span className="font-medium text-foreground">{accounts.length} mailbox</span> sekaligus dalam
+            satu proses, berurutan. Membaca di sini{" "}
+            <span className="font-medium text-foreground">tidak</span> menandai email sebagai sudah dibaca di Gmail.
           </DialogDescription>
         </DialogHeader>
 
-        {running || stage === "selesai" || summary ? (
+        {akun.length > 0 ? (
           <div className="space-y-3">
-            <div>
-              <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-[12.5px] font-medium text-foreground">
-                  {stage === "selesai" ? "Selesai" : "Sedang berjalan…"}
-                </span>
-                <span className="tabular-nums text-[12px] text-muted-foreground">
-                  {shownPercent}% · {elapsed} detik
-                </span>
+            {running || semuaSelesai || elapsed > 0 ? (
+              <div>
+                <div className="mb-1.5 flex items-baseline justify-between">
+                  <span className="text-[12.5px] font-medium text-foreground">
+                    {semuaSelesai ? "Selesai" : "Sedang berjalan…"}
+                  </span>
+                  <span className="tabular-nums text-[12px] text-muted-foreground">
+                    {shownPercent}% · {elapsed} detik
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-[width] duration-500 ease-out",
+                      semuaSelesai ? "bg-emerald-500" : "bg-primary",
+                    )}
+                    style={{ width: `${Math.max(3, shownPercent)}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-[width] duration-500 ease-out",
-                    stage === "selesai" ? "bg-emerald-500" : "bg-primary",
-                  )}
-                  style={{ width: `${Math.max(3, shownPercent)}%` }}
-                />
-              </div>
-            </div>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">Akan diperiksa:</p>
+            )}
 
-            <ol className="space-y-1.5">
-              {STEPS.map((step, index) => {
-                const state = stepState(index);
+            <ol className="space-y-2">
+              {akun.map((a) => {
+                const sedangAktif = a.stage !== "selesai" && a.stage !== "wait";
                 const counter =
-                  step.key === "fetch" && state !== "wait" && fetchInfo && fetchInfo.collected > 0
-                    ? `${fetchInfo.collected} email · ${fetchInfo.page} hlm`
-                    : step.key === "save" && state !== "wait" && saveInfo
-                      ? `${saveInfo.done}/${saveInfo.total}`
+                  a.stage === "fetch" && a.fetch
+                    ? `${a.fetch.collected} email · ${a.fetch.page} hlm`
+                    : a.stage === "save" && a.save
+                      ? `${a.save.done}/${a.save.total}`
                       : null;
 
+                const detail = a.result
+                  ? `${a.result.unreadFound} belum dibaca` +
+                    (a.result.created ? ` · ${a.result.created} baru` : "") +
+                    (a.result.markedRead ? ` · ${a.result.markedRead} dikeluarkan` : "")
+                  : a.stage === "wait"
+                    ? a.email
+                    : a.stage === "selesai"
+                      ? "selesai"
+                      : STAGE_TEXT[a.stage];
+
                 return (
-                  <li key={step.key} className="flex items-center gap-2">
+                  <li key={a.email} className="flex items-start gap-2">
                     <span
                       className={cn(
-                        "flex size-4 shrink-0 items-center justify-center rounded-full",
-                        state === "done" && "bg-emerald-500 text-white",
-                        state === "active" && "bg-primary/10 text-primary",
-                        state === "wait" && "bg-muted text-muted-foreground",
+                        "mt-px flex size-4 shrink-0 items-center justify-center rounded-full",
+                        a.stage === "selesai" && "bg-emerald-500 text-white",
+                        sedangAktif && "bg-primary/10 text-primary",
+                        a.stage === "wait" && "bg-muted text-muted-foreground",
                       )}
                     >
-                      {state === "done" ? (
+                      {a.stage === "selesai" ? (
                         <Check className="size-2.5" strokeWidth={3.5} />
-                      ) : state === "active" ? (
+                      ) : sedangAktif ? (
                         <Loader2 className="size-2.5 animate-spin" strokeWidth={3} />
                       ) : (
                         <span className="size-1 rounded-full bg-current" />
                       )}
                     </span>
-                    <span
-                      className={cn(
-                        "text-[12.5px] leading-none",
-                        state === "wait" ? "text-muted-foreground" : "text-foreground",
-                        state === "active" && "font-medium",
-                      )}
-                    >
-                      {step.label}
-                    </span>
-                    {counter ? (
-                      <span className="ml-auto text-[11.5px] tabular-nums text-muted-foreground">{counter}</span>
-                    ) : null}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span
+                          className={cn(
+                            "truncate text-[12.5px] leading-tight",
+                            a.stage === "wait" ? "text-muted-foreground" : "text-foreground",
+                            sedangAktif && "font-medium",
+                          )}
+                        >
+                          {a.label}
+                        </span>
+                        {counter ? (
+                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{counter}</span>
+                        ) : null}
+                      </div>
+                      <p className="truncate text-[11px] leading-tight text-muted-foreground">{detail}</p>
+                    </div>
                   </li>
                 );
               })}
             </ol>
 
-            {note && stage !== "selesai" ? (
-              <p className="truncate text-[11.5px] text-muted-foreground">{note}</p>
-            ) : null}
-
-            {summary ? (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">
-                {summary}
-              </p>
+            {aktif && aktif.note && !semuaSelesai ? (
+              <p className="truncate text-[11.5px] text-muted-foreground">{aktif.note}</p>
             ) : null}
           </div>
         ) : null}
@@ -296,7 +354,7 @@ export function EmailSyncControls({ account, label }: { account: string; label: 
           </Button>
           <Button onClick={run} disabled={running}>
             {running ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            {running ? "Mengecek…" : "Mulai cek"}
+            {running ? "Mengecek…" : semuaSelesai ? "Cek ulang" : "Mulai cek"}
           </Button>
         </DialogFooter>
       </DialogContent>

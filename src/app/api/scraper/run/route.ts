@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { getSession, getClientIp } from "@/lib/auth";
+import { guardApi, ditolak } from "@/lib/api-guard";
+import { getClientIp } from "@/lib/auth";
 import { runDailyScrape } from "@/lib/sync";
 import { isValidDateString, yesterdayWib } from "@/lib/time";
 import { logActivity } from "@/lib/activity";
@@ -21,10 +21,8 @@ export const maxDuration = 300;
  *   {"type":"error","message":"..."}
  */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ ok: false, message: "Sesi berakhir. Silakan login ulang." }, { status: 401 });
-  }
+  const session = await guardApi(["ADMIN", "PIMPINAN"]);
+  if (ditolak(session)) return session;
 
   const body = (await request.json().catch(() => ({}))) as { date?: string };
   const date = body.date && isValidDateString(body.date) ? body.date : yesterdayWib();

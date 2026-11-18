@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { guardApi, ditolak } from "@/lib/api-guard";
 import { runDailyScrape, runMonthlyReview, syncActiveOrderStatuses } from "@/lib/sync";
 import { logActivity } from "@/lib/activity";
 
@@ -8,10 +8,8 @@ export const maxDuration = 300;  // batas maksimum Vercel Hobby; Docker/VPS bisa
 
 /** Jalankan ulang proses yang gagal. Aman dijalankan ulang (upsert). */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ ok: false, message: "Sesi berakhir." }, { status: 401 });
-  }
+  const session = await guardApi(["ADMIN", "PIMPINAN"]);
+  if (ditolak(session)) return session;
 
   const body = (await request.json().catch(() => ({}))) as { logId?: string };
   if (!body.logId) {
