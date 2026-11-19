@@ -17,11 +17,13 @@ const nextConfig: NextConfig = {
   },
   // Playwright dan Chromium serverless harus tetap di luar bundle JavaScript
   // (keduanya membawa biner besar yang harus dibaca langsung dari node_modules).
+  // @node-rs/bcrypt juga: ia memuat berkas .node biner per platform.
   serverExternalPackages: [
     "playwright",
     "playwright-core",
     "@sparticuz/chromium",
     "@sparticuz/chromium-min",
+    "@node-rs/bcrypt",
   ],
 
   // Pastikan biner Chromium serverless dan berkas data Playwright IKUT dikemas

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { runEmailSync, type EmailProgress } from "@/lib/email/sync";
+import { segarkanBalasanCepat } from "@/lib/email/reply-sync";
 
 export const maxDuration = 60;
 
@@ -86,7 +87,15 @@ async function handle(request: Request) {
         return NextResponse.json({ ok: false, message, errors }, { status });
       }
 
-      return NextResponse.json({ ok: true, results, errors });
+      // Sekalian perbarui statistik waktu balas supaya grafik di halaman
+      // Waktu Balas ikut bergerak tanpa user menekan apa pun. Kegagalan di
+      // sini TIDAK boleh menggagalkan sync email — dicatat, lalu dilanjutkan.
+      const balasan = await segarkanBalasanCepat().catch((e: unknown) => {
+        console.error("[email/sync] gagal menyegarkan balasan:", e);
+        return null;
+      });
+
+      return NextResponse.json({ ok: true, results, errors, balasan });
     } catch (error) {
       console.error("[email/sync] gagal:", error);
       const { message, status } = pesanUntuk(error);

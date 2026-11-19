@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { BarChart3, CalendarClock, PackageCheck } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { LoginForm } from "@/components/login-form";
 
@@ -23,66 +22,74 @@ export default async function LoginPage({
   const notice = reason ? NOTICES[reason] : undefined;
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="relative hidden flex-col justify-between bg-sidebar p-10 text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-white/95 p-1">
-            <Image src="/logo-instaprint.png" alt="Instaprint" width={32} height={18} className="h-auto w-8" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">Instaprint</p>
-            <p className="text-xs text-sidebar-muted">Digital Printing</p>
-          </div>
+    <main className="flex min-h-screen items-start justify-center bg-[#f2f3f4] px-3 py-6 sm:items-center sm:p-6 lg:p-8">
+      <div className="w-full max-w-[1000px] rounded-[24px] bg-card p-2.5 shadow-[0_1px_2px_rgb(16_24_40/0.04),0_32px_64px_-44px_rgb(16_24_40/0.4)] sm:rounded-[28px] sm:p-3.5">
+        <div className="grid gap-0 lg:min-h-[636px] lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:gap-2">
+          <section className="flex flex-col justify-center px-2.5 py-5 sm:px-6 sm:py-7 lg:px-9 lg:py-8">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/logo-instaprint.png"
+                alt="Instaprint"
+                width={212}
+                height={120}
+                priority
+                className="h-8 w-auto"
+              />
+              <span className="h-6 w-px shrink-0 bg-border" aria-hidden />
+              <span className="text-[9px] font-semibold uppercase leading-[1.35] tracking-[0.13em] text-muted-foreground">
+                Monitoring
+                <br />
+                System
+              </span>
+            </div>
+
+            <h1 className="mt-10 text-[24px] font-semibold leading-[1.2] tracking-[-0.022em] sm:text-[27px]">
+              Selamat datang kembali
+            </h1>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+              Masuk untuk memantau pesanan, tenggat, dan status produksi seluruh cabang.
+            </p>
+
+            <div className="mt-7 space-y-3">
+              <LoginForm notice={notice} />
+            </div>
+
+            <p className="mt-6 text-[11px] leading-[1.7] text-muted-foreground">
+              Sesi berakhir otomatis setelah 30 menit tanpa aktivitas. Butuh bantuan? Hubungi
+              administrator sistem.
+            </p>
+          </section>
+
+          <aside className="relative hidden overflow-hidden rounded-[32px] lg:block">
+            {/* Masker sudut cekung membungkus foto + lapisan gelap, supaya area
+                yang terpotong tetap putih bersih seperti kartunya. */}
+            <div className="scoop-corners absolute inset-0">
+              <Image
+                src="/login-hero.jpg"
+                alt=""
+                aria-hidden
+                fill
+                priority
+                sizes="(min-width: 1000px) 620px, 62vw"
+                className="object-cover"
+              />
+              <div
+                className="absolute inset-0 bg-[linear-gradient(180deg,rgb(6_10_20/0.76)_0%,rgb(6_10_20/0.34)_32%,rgb(6_10_20/0.12)_58%,rgb(6_10_20/0.62)_100%)]"
+                aria-hidden
+              />
+            </div>
+
+            <div className="relative flex h-full flex-col justify-between px-8 py-8 xl:px-10">
+              <p className="mx-auto max-w-[19rem] text-balance pt-3 text-center text-[14px] font-semibold leading-[1.55] text-white">
+                Pantau setiap pesanan, tenggat, dan status produksi dalam satu tampilan.
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                Instaprint · Sistem Internal
+              </p>
+            </div>
+          </aside>
         </div>
-
-        <div className="max-w-md space-y-6">
-          <h1 className="text-3xl font-semibold leading-tight text-white">
-            Monitoring pesanan seluruh cabang dalam satu tampilan.
-          </h1>
-          <p className="text-sm leading-relaxed text-sidebar-muted">
-            Data pesanan diambil otomatis dari website internal Instaprint setiap hari, lalu dipantau
-            status dan tenggatnya di sini.
-          </p>
-          <ul className="space-y-3 text-sm">
-            {[
-              { icon: PackageCheck, text: "Rekap pesanan masuk kemarin per cabang" },
-              { icon: CalendarClock, text: "Pantau tenggat pengerjaan & pesanan terlambat" },
-              { icon: BarChart3, text: "Pemeriksaan bulanan dan analisis AI" },
-            ].map((item) => (
-              <li key={item.text} className="flex items-center gap-3 text-sidebar-foreground">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent">
-                  <item.icon className="size-4 text-blue-300" />
-                </span>
-                {item.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="text-xs text-sidebar-muted">
-          © {new Date().getFullYear()} Instaprint. Sistem internal.
-        </p>
-      </section>
-
-      <section className="flex items-center justify-center px-5 py-12">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <Image src="/logo-instaprint.png" alt="Instaprint" width={44} height={25} className="h-auto w-11" />
-            <span className="text-sm font-semibold">Instaprint</span>
-          </div>
-
-          <h2 className="text-xl font-semibold tracking-tight">Masuk ke Monitoring System</h2>
-          <p className="mb-7 mt-1 text-sm text-muted-foreground">
-            Gunakan akun internal Instaprint untuk melanjutkan.
-          </p>
-
-          <LoginForm notice={notice} />
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            Butuh bantuan akses? Hubungi administrator sistem.
-          </p>
-        </div>
-      </section>
+      </div>
     </main>
   );
 }

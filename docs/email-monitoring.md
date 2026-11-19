@@ -139,6 +139,47 @@ memperbarui **tampilan**; pengambilan tetap tugas penjadwal di server, supaya
 data terisi walau tidak ada tab terbuka. Penyegaran dilewati saat tab tidak
 terlihat, dan dijalankan sekali saat tab kembali dibuka bila sudah lewat sejam.
 
+## Banyak cabang
+
+Satu cabang boleh punya lebih dari satu alamat email. Yang tampil di sidebar
+adalah **cabang**, dan alamat-alamatnya jadi tab di dalam halaman itu.
+
+```dotenv
+MAIL_ACCOUNT_1_EMAIL="instaprint24@gmail.com"
+MAIL_ACCOUNT_1_LABEL="Instaprint Pusat"
+MAIL_ACCOUNT_1_GROUP="Pusat"
+MAIL_ACCOUNT_1_CONNECTED_ACCOUNT_ID="ca_..."
+
+MAIL_ACCOUNT_2_EMAIL="onlineorder@instaprint8.com"
+MAIL_ACCOUNT_2_LABEL="Online Order"
+MAIL_ACCOUNT_2_GROUP="Pusat"          # satu cabang dengan akun 1
+MAIL_ACCOUNT_2_CONNECTED_ACCOUNT_ID="ca_..."
+
+MAIL_ACCOUNT_3_EMAIL="instaprintgs@instaprint8.com"
+MAIL_ACCOUNT_3_LABEL="Gading Serpong"
+MAIL_ACCOUNT_3_GROUP="Gading Serpong"
+MAIL_ACCOUNT_3_CONNECTED_ACCOUNT_ID="ca_..."
+```
+
+- `GROUP` menentukan cabang; `LABEL` hanya nama tab.
+- Tanpa `GROUP`, akun dianggap cabang tersendiri memakai `LABEL` — konfigurasi
+  lama tetap jalan.
+- Urutan sidebar mengikuti nomor akun.
+- Alamat: `/email/pusat`, `/email/gading-serpong`, `/email/bsd`. Slug dibentuk
+  otomatis dari nama grup.
+- Menambah cabang = menambah satu akun baru dengan `GROUP` baru; tidak ada kode
+  yang perlu diubah.
+
+Yang mengikuti cabang:
+
+| Bagian | Perilaku |
+|---|---|
+| Sidebar | Dropdown Email berisi daftar cabang + jumlah belum dibaca |
+| Tombol Cek sekarang | Memeriksa semua alamat di cabang itu sekaligus |
+| Laporan Excel | Satu file berisi semua alamat cabang itu |
+| Riwayat | Menampilkan semua alamat cabang itu (`/email/riwayat?grup=...`) |
+| Penjadwal tiap jam | Tetap memeriksa seluruh cabang |
+
 ## Laporan Excel
 
 Tombol **Excel** mengunduh SATU file `.xlsx` yang memuat **semua mailbox

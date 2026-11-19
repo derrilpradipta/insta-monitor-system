@@ -23,7 +23,31 @@ export type MailAccount = {
   connectedAccountId: string;
   /** Nama pendek untuk tab; kalau kosong dipakai alamat email. */
   label: string;
+  /**
+   * Nama grup/cabang pemilik akun ini, mis. "Pusat" atau "Gading Serpong".
+   * Beberapa alamat bisa berbagi satu grup — itulah yang tampil sebagai satu
+   * entri di sidebar dengan tab per alamat di dalamnya.
+   */
+  group: string;
 };
+
+/** Satu cabang: nama grup + seluruh mailbox yang bernaung di bawahnya. */
+export type MailGroup = {
+  /** Bagian URL, mis. "gading-serpong". */
+  slug: string;
+  name: string;
+  accounts: MailAccount[];
+};
+
+/** Ubah nama grup jadi bentuk aman untuk URL. */
+export function groupSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 export type ComposioConfig = {
   apiKey: string;
@@ -55,8 +79,19 @@ export function readComposioConfig(): ComposioConfig {
 }
 
 /**
- * Semua mailbox yang dikonfigurasi. Urutannya mengikuti indeks, jadi tab di
- * halaman mengikuti urutan yang sama.
+ * Semua mailbox yang dikonfigurasi. Urutannya mengikuti indeks, jadi entri di
+ * sidebar mengikuti urutan yang sama.
+ *
+ * Tiap akun bisa punya GROUP, mis.:
+ *   MAIL_ACCOUNT_1_EMAIL="instaprint24@gmail.com"
+ *   MAIL_ACCOUNT_1_LABEL="Instaprint Pusat"
+ *   MAIL_ACCOUNT_1_GROUP="Pusat"
+ *   MAIL_ACCOUNT_2_EMAIL="onlineorder@instaprint8.com"
+ *   MAIL_ACCOUNT_2_LABEL="Online Order"
+ *   MAIL_ACCOUNT_2_GROUP="Pusat"
+ *
+ * Akun tanpa GROUP dianggap grup tersendiri memakai LABEL-nya, jadi
+ * konfigurasi lama tetap jalan tanpa diubah.
  */
 export function readMailAccounts(): MailAccount[] {
   const akun: MailAccount[] = [];
@@ -65,6 +100,7 @@ export function readMailAccounts(): MailAccount[] {
     const email = (process.env[`MAIL_ACCOUNT_${i}_EMAIL`] ?? "").trim();
     const connectedAccountId = (process.env[`MAIL_ACCOUNT_${i}_CONNECTED_ACCOUNT_ID`] ?? "").trim();
     const label = (process.env[`MAIL_ACCOUNT_${i}_LABEL`] ?? "").trim();
+    const group = (process.env[`MAIL_ACCOUNT_${i}_GROUP`] ?? "").trim();
 
     if (!email || !connectedAccountId) continue;
 
@@ -72,6 +108,7 @@ export function readMailAccounts(): MailAccount[] {
       email,
       connectedAccountId,
       label: label || email,
+      group: group || label || email,
     });
   }
 
@@ -80,11 +117,40 @@ export function readMailAccounts(): MailAccount[] {
     const lamaEmail = (process.env.MAIL_ACCOUNT_EMAIL ?? "").trim();
     const lamaId = (process.env.COMPOSIO_CONNECTED_ACCOUNT_ID ?? "").trim();
     if (lamaEmail && lamaId) {
-      akun.push({ email: lamaEmail, connectedAccountId: lamaId, label: lamaEmail });
+      akun.push({ email: lamaEmail, connectedAccountId: lamaId, label: lamaEmail, group: lamaEmail });
     }
   }
 
   return akun;
+}
+
+/**
+ * Kelompokkan akun per cabang, mengikuti urutan kemunculan pertama.
+ * Dipakai sidebar dan pemilih cabang di halaman Email.
+ */
+export function readMailGroups(): MailGroup[] {
+  const grup: MailGroup[] = [];
+  const peta = new Map<string, MailGroup>();
+
+  for (const akun of readMailAccounts()) {
+    const kunci = akun.group.toLowerCase();
+    let ada = peta.get(kunci);
+    if (!ada) {
+      ada = { slug: groupSlug(akun.group), name: akun.group, accounts: [] };
+      peta.set(kunci, ada);
+      grup.push(ada);
+    }
+    ada.accounts.push(akun);
+  }
+
+  return grup;
+}
+
+/** Cari grup berdasarkan slug URL; null kalau tidak ada. */
+export function findMailGroup(slug: string): MailGroup | null {
+  const s = (slug ?? "").trim().toLowerCase();
+  if (!s) return null;
+  return readMailGroups().find((g) => g.slug === s) ?? null;
 }
 
 /** Cari satu akun berdasarkan alamat email; null kalau tidak dikonfigurasi. */

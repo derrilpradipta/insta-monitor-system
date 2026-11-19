@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader, EmptyState } from "@/components/shell/page-header";
 import { readParam, type SearchParams } from "@/lib/query";
 import { formatDateTimeId } from "@/lib/time";
-import { readMailAccounts } from "@/lib/email/accounts";
+import { readMailGroups } from "@/lib/email/accounts";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Riwayat Email" };
@@ -23,15 +23,19 @@ const STATUS_LABEL: Record<string, { text: string; className: string }> = {
  *
  * Sengaja halaman sendiri (bukan di /history) supaya tidak tercampur dengan
  * riwayat pengambilan data pesanan — dua hal berbeda dengan jadwal berbeda.
+ *
+ * Query `?grup=<slug>` membatasi ke satu cabang; tanpa itu semua cabang tampil.
  */
 export default async function EmailHistoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const akunTersedia = readMailAccounts();
-  const akunDiminta = readParam(params, "akun");
-  const akunAktif = akunTersedia.find((a) => a.email === akunDiminta) ?? akunTersedia[0] ?? null;
+  const grupSlug = readParam(params, "grup") ?? "";
+  const grup = grupSlug ? (readMailGroups().find((g) => g.slug === grupSlug) ?? null) : null;
+  const semuaGrup = readMailGroups();
+
+  const akunDiizinkan = grup ? grup.accounts.map((a) => a.email) : semuaGrup.flatMap((g) => g.accounts.map((a) => a.email));
   const page = Math.max(1, Number(readParam(params, "page")) || 1);
 
-  if (!akunAktif) {
+  if (akunDiizinkan.length === 0) {
     return (
       <div className="space-y-5">
         <PageHeader title="Riwayat Pengecekan Email" description="Belum ada akun email yang dikonfigurasi." />
@@ -42,15 +46,18 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
     );
   }
 
+  const where = { accountEmail: { in: akunDiizinkan } };
+
   const [total, runs] = await Promise.all([
-    prisma.emailSyncRun.count({ where: { accountEmail: akunAktif.email } }),
+    prisma.emailSyncRun.count({ where }),
     prisma.emailSyncRun.findMany({
-      where: { accountEmail: akunAktif.email },
+      where,
       orderBy: { startedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       select: {
         id: true,
+        accountEmail: true,
         status: true,
         startedAt: true,
         finishedAt: true,
@@ -66,8 +73,12 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const hrefAkun = (email: string) =>
-    email === akunTersedia[0]?.email ? "/email/riwayat" : `/email/riwayat?akun=${encodeURIComponent(email)}`;
+  const labelAkun = new Map(
+    semuaGrup.flatMap((g) => g.accounts.map((a) => [a.email, a.label] as const)),
+  );
+
+  const hrefGrup = (slug: string) => (slug ? `/email/riwayat?grup=${encodeURIComponent(slug)}` : "/email/riwayat");
+  const kembali = grup ? `/email/${grup.slug}` : "/email";
 
   return (
     <div className="space-y-5">
@@ -75,27 +86,25 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
         title="Riwayat Pengecekan Email"
         description="Catatan setiap pengambilan email belum dibaca. Terpisah dari riwayat pengambilan data pesanan."
       >
-        <Link
-          href="/email"
-          className="rounded-md px-3 py-1.5 text-[12.5px] shadow-[0_0_0_1px_var(--input)] hover:bg-muted"
-        >
+        <Link href={kembali} className="rounded-md px-3 py-1.5 text-[12.5px] shadow-[0_0_0_1px_var(--input)] hover:bg-muted">
           ← Kembali ke Email
         </Link>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-card p-1 shadow-[0_0_0_1px_var(--input)] w-fit">
-        {akunTersedia.map((akun) => (
+      {/* Pemilih cabang */}
+      <div className="flex w-fit flex-wrap items-center gap-1.5 rounded-md bg-card p-1 shadow-[0_0_0_1px_var(--input)]">
+        {[{ slug: "", name: "Semua" }, ...semuaGrup.map((g) => ({ slug: g.slug, name: g.name }))].map((item) => (
           <Link
-            key={akun.email}
-            href={hrefAkun(akun.email)}
+            key={item.slug || "semua"}
+            href={hrefGrup(item.slug)}
             className={cn(
               "h-7 rounded px-2.5 text-[12px] font-medium leading-7 transition-colors",
-              akun.email === akunAktif.email
+              (grup?.slug ?? "") === item.slug
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {akun.label}
+            {item.name}
           </Link>
         ))}
       </div>
@@ -108,11 +117,11 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-[12.5px]">
+            <table className="w-full min-w-[860px] border-collapse text-[12.5px]">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-2 font-medium">Mulai</th>
-                  <th className="px-4 py-2 font-medium">Selesai</th>
+                  <th className="px-4 py-2 font-medium">Alamat</th>
                   <th className="px-4 py-2 text-right font-medium">Ditemukan</th>
                   <th className="px-4 py-2 text-right font-medium">Baru</th>
                   <th className="px-4 py-2 text-right font-medium">Diperbarui</th>
@@ -132,8 +141,8 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
                       <td className="whitespace-nowrap px-4 py-2 tabular-nums">
                         {formatDateTimeId(r.startedAt)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted-foreground">
-                        {r.finishedAt ? formatDateTimeId(r.finishedAt) : "—"}
+                      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+                        {labelAkun.get(r.accountEmail) ?? r.accountEmail}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">{r.unreadFound}</td>
                       <td className="px-4 py-2 text-right tabular-nums">{r.created}</td>
@@ -167,7 +176,7 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
           <div className="flex gap-2">
             {page > 1 ? (
               <Link
-                href={`${hrefAkun(akunAktif.email)}${hrefAkun(akunAktif.email).includes("?") ? "&" : "?"}page=${page - 1}`}
+                href={`${hrefGrup(grup?.slug ?? "")}${hrefGrup(grup?.slug ?? "").includes("?") ? "&" : "?"}page=${page - 1}`}
                 className="rounded-md px-2.5 py-1 shadow-[0_0_0_1px_var(--input)] hover:bg-muted"
               >
                 Sebelumnya
@@ -175,7 +184,7 @@ export default async function EmailHistoryPage({ searchParams }: { searchParams:
             ) : null}
             {page < totalPages ? (
               <Link
-                href={`${hrefAkun(akunAktif.email)}${hrefAkun(akunAktif.email).includes("?") ? "&" : "?"}page=${page + 1}`}
+                href={`${hrefGrup(grup?.slug ?? "")}${hrefGrup(grup?.slug ?? "").includes("?") ? "&" : "?"}page=${page + 1}`}
                 className="rounded-md px-2.5 py-1 shadow-[0_0_0_1px_var(--input)] hover:bg-muted"
               >
                 Berikutnya

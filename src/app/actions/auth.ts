@@ -17,7 +17,7 @@ import {
 } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 
-export type LoginState = { error?: string };
+export type LoginState = { error?: string; identifier?: string };
 
 // Pembatasan percobaan login per IP: hanya KEGAGALAN yang dihitung,
 // dan hitungan direset setelah login berhasil.
@@ -50,12 +50,12 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const password = String(formData.get("password") ?? "");
 
   if (!identifier || !password) {
-    return { error: "Email/username dan password wajib diisi." };
+    return { error: "Email/username dan password wajib diisi.", identifier };
   }
 
   const ip = await getClientIp();
   if (isIpBlocked(ip)) {
-    return { error: "Terlalu banyak percobaan login dari perangkat ini. Coba lagi beberapa menit lagi." };
+    return { error: "Terlalu banyak percobaan login dari perangkat ini. Coba lagi beberapa menit lagi.", identifier };
   }
 
   const result = await authenticate(identifier, password);
@@ -68,7 +68,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       description: `Percobaan login gagal untuk "${identifier}" (${result.code})`,
       ipAddress: ip,
     });
-    return { error: result.message };
+    return { error: result.message, identifier };
   }
 
   // Session fixation: sesi lama (jika ada) dicabut, token baru selalu dibuat.

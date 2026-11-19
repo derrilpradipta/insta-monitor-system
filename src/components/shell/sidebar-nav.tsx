@@ -9,23 +9,22 @@ import {
   ClipboardCheck,
   History,
   LogOut,
-  Mail,
   Menu,
   Sparkles,
+  Timer,
   UserRound,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmailNavDropdown, type EmailNavGroup } from "@/components/shell/email-nav-dropdown";
 import { ROLE_LABEL } from "@/lib/labels";
 import type { Role } from "@prisma/client";
 
-const MAIN_NAV = [
-  { href: "/deadline", label: "Deadline", icon: CalendarClock },
-  { href: "/email", label: "Email", icon: Mail },
-];
+const MAIN_NAV = [{ href: "/deadline", label: "Deadline", icon: CalendarClock }];
 
 const SUPPORT_NAV = [
+  { href: "/waktu-balas", label: "Waktu Balas Email", icon: Timer },
   { href: "/monthly-review", label: "Pemeriksaan Bulanan", icon: ClipboardCheck },
   { href: "/history", label: "Riwayat Pengambilan", icon: History },
   { href: "/analysis", label: "Analisis AI", icon: Sparkles },
@@ -36,10 +35,13 @@ const SUPPORT_NAV = [
 export function SidebarNav({
   user,
   unread,
+  emailGroups,
   logoutAction,
 }: {
   user: { name: string; email: string; role: Role };
   unread: number;
+  /** Cabang email beserta jumlah belum dibaca, untuk dropdown di menu utama. */
+  emailGroups: EmailNavGroup[];
   logoutAction: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -122,6 +124,7 @@ export function SidebarNav({
           {MAIN_NAV.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
+          {emailGroups.length > 0 ? <EmailNavDropdown groups={emailGroups} /> : null}
         </div>
 
         <div className="space-y-0.5">

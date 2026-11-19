@@ -9,6 +9,7 @@ const PROTECTED_PREFIXES = [
   "/orders",
   "/deadline",
   "/email",
+  "/waktu-balas",
   "/monthly-review",
   "/history",
   "/notifications",

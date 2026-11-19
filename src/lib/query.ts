@@ -61,3 +61,30 @@ export async function getShellData() {
 }
 
 export { formatNumber };
+
+/**
+ * Jumlah email belum dibaca per CABANG (bukan per alamat).
+ *
+ * Sidebar menampilkan satu angka di menu Email dan satu angka per cabang, jadi
+ * yang dibutuhkan adalah total per grup. Dihitung sekali per request.
+ */
+export async function getEmailUnreadByGroup(): Promise<{ slug: string; name: string; unread: number }[]> {
+  const { readMailGroups } = await import("@/lib/email/accounts");
+  const groups = readMailGroups();
+  if (groups.length === 0) return [];
+
+  const semuaEmail = groups.flatMap((g) => g.accounts.map((a) => a.email));
+  const rows = await prisma.emailMessage.groupBy({
+    by: ["accountEmail"],
+    where: { isRead: false, accountEmail: { in: semuaEmail } },
+    _count: { _all: true },
+  });
+
+  const perEmail = new Map(rows.map((r) => [r.accountEmail, r._count._all]));
+
+  return groups.map((g) => ({
+    slug: g.slug,
+    name: g.name,
+    unread: g.accounts.reduce((n, a) => n + (perEmail.get(a.email) ?? 0), 0),
+  }));
+}

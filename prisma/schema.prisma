@@ -352,3 +352,38 @@ model EmailSyncRun {
   @@index([accountEmail, startedAt])
   @@map("email_sync_runs")
 }
+
+/// Kecepatan balas email, satu baris per percakapan (thread).
+///
+/// Dihitung dari Gmail: pesan masuk pertama di sebuah thread, lalu pesan
+/// keluar pertama sesudahnya. Hanya metadata yang dibaca — status belum-dibaca
+/// di mailbox tidak diubah.
+model EmailReplyStat {
+  id           String    @id @default(cuid())
+  /// Mailbox pemilik percakapan; thread id hanya unik di dalam satu mailbox.
+  accountEmail String    @map("account_email")
+  /// ID thread Gmail, pengait pesan masuk dengan balasannya.
+  threadId     String    @map("thread_id")
+  subject      String
+  fromName     String?   @map("from_name")
+  fromAddress  String    @map("from_address")
+  /// Waktu email pertama masuk di thread ini.
+  receivedAt   DateTime  @map("received_at")
+  /// Waktu balasan pertama terkirim; null berarti belum dibalas.
+  repliedAt    DateTime? @map("replied_at")
+  /// Selisih menit kalender (apa adanya, termasuk malam dan akhir pekan).
+  replyMinutes Int?      @map("reply_minutes")
+  /// Selisih menit yang hanya menghitung jam kerja (Sen–Jum, 08.00–17.00 WIB).
+  workMinutes  Int?      @map("work_minutes")
+  /// Pesan yang tidak perlu dibalas (newsletter, notifikasi sistem).
+  isAutomated  Boolean   @default(false) @map("is_automated")
+  /// Jumlah pesan masuk di thread ini, untuk menandai percakapan panjang.
+  inboundCount Int       @default(1) @map("inbound_count")
+  syncedAt     DateTime  @default(now()) @map("synced_at")
+
+  @@unique([accountEmail, threadId])
+  @@index([accountEmail, receivedAt])
+  @@index([receivedAt])
+  @@index([repliedAt])
+  @@map("email_reply_stats")
+}

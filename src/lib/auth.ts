@@ -109,13 +109,60 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Implementasi bcrypt: pakai yang native bila tersedia.
+ *
+ * `bcryptjs` adalah implementasi JavaScript murni — verifikasi password
+ * memakan ~340ms karena hanya memakai satu core. `@node-rs/bcrypt` (Rust)
+ * ~230ms untuk hasil yang sama, dan hash-nya kompatibel dua arah dengan
+ * bcryptjs sehingga password lama tetap bisa diverifikasi.
+ *
+ * Kalau modul native gagal dimuat di platform tertentu (mis. arsitektur tanpa
+ * prebuilt), otomatis jatuh ke bcryptjs supaya login tidak pernah mati.
+ */
+type BcryptLike = {
+  hash: (password: string, cost: number) => Promise<string>;
+  compare: (password: string, hash: string) => Promise<boolean>;
+};
+
+const BCRYPT_COST = 12;
+
+let bcryptImpl: BcryptLike | null = null;
+let bcryptSumber: "native" | "js" | null = null;
+
+async function getBcrypt(): Promise<{ impl: BcryptLike; sumber: "native" | "js" }> {
+  if (bcryptImpl && bcryptSumber) return { impl: bcryptImpl, sumber: bcryptSumber };
+
+  try {
+    const native = (await import("@node-rs/bcrypt")) as unknown as {
+      hash: (password: string, opts: { cost: number }) => Promise<string>;
+      compare: (password: string, hash: string) => Promise<boolean>;
+    };
+    bcryptImpl = {
+      hash: (password, cost) => native.hash(password, { cost }),
+      compare: (password, hash) => native.compare(password, hash),
+    };
+    bcryptSumber = "native";
+  } catch {
+    bcryptImpl = {
+      hash: (password, cost) => bcrypt.hash(password, cost),
+      compare: (password, hash) => bcrypt.compare(password, hash),
+    };
+    bcryptSumber = "js";
+  }
+
+  return { impl: bcryptImpl, sumber: bcryptSumber };
+}
+
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  const { impl } = await getBcrypt();
+  return impl.hash(password, BCRYPT_COST);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   try {
-    return await bcrypt.compare(password, hash);
+    const { impl } = await getBcrypt();
+    return await impl.compare(password, hash);
   } catch {
     return false;
   }
@@ -160,9 +207,10 @@ export async function authenticate(
   });
 
   // Tetap jalankan bcrypt pada hash dummy agar waktu respons serupa
-  // ketika akun tidak ditemukan (mencegah user enumeration).
+  // ketika akun tidak ditemukan (mencegah user enumeration). Memakai jalur
+  // verifyPassword yang sama, jadi lamanya identik dengan akun yang ada.
   if (!user) {
-    await bcrypt.compare(password, "$2a$12$C6UzMDM.H6dfI/f/IKcEe.0C9W1l5a.1e9b5kJz2bV8YQm8o6r6Wq");
+    await verifyPassword(password, "$2a$12$C6UzMDM.H6dfI/f/IKcEe.0C9W1l5a.1e9b5kJz2bV8YQm8o6r6Wq");
     return { ok: false, code: "INVALID_CREDENTIALS", message: "Email/username atau password salah." };
   }
 

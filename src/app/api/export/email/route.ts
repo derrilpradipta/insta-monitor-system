@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { formatDateTimeId } from "@/lib/time";
-import { readMailAccounts } from "@/lib/email/accounts";
+import { readMailAccounts, readMailGroups } from "@/lib/email/accounts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -32,11 +32,19 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const semua = url.searchParams.get("filter") === "semua";
+  const grupSlug = (url.searchParams.get("grup") ?? "").trim();
 
-  const akunTersedia = readMailAccounts();
+  // Tanpa ?grup → semua cabang. Dengan ?grup → hanya alamat di cabang itu.
+  const grup = grupSlug ? readMailGroups().find((g) => g.slug === grupSlug) : null;
+  const akunTersedia = grup ? grup.accounts : readMailAccounts();
+
+  const emailDiizinkan = akunTersedia.map((a) => a.email);
 
   const emails = await prisma.emailMessage.findMany({
-    where: semua ? {} : { isRead: false },
+    where: {
+      ...(semua ? {} : { isRead: false }),
+      accountEmail: { in: emailDiizinkan },
+    },
     orderBy: [{ accountEmail: "asc" }, { receivedAt: "desc" }],
     take: MAX_ROWS,
     select: {
@@ -75,10 +83,11 @@ export async function GET(request: Request) {
   const sheet = workbook.addWorksheet("Email");
 
   const judulFilter = semua ? "Semua email tersimpan" : "Email belum dibaca";
+  const judulCabang = grup ? grup.name : "Semua Cabang";
 
   sheet.mergeCells("A1:J1");
   const titleCell = sheet.getCell("A1");
-  titleCell.value = "Laporan Email — Semua Akun";
+  titleCell.value = `Laporan Email — ${judulCabang}`;
   titleCell.font = { bold: true, size: 14 };
   titleCell.alignment = { vertical: "middle" };
 
@@ -189,7 +198,8 @@ export async function GET(request: Request) {
   ];
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `email-${semua ? "semua" : "belum-dibaca"}-semua-akun-${new Date()
+  const bagianNama = grup ? grup.slug : "semua-cabang";
+  const filename = `email-${semua ? "semua" : "belum-dibaca"}-${bagianNama}-${new Date()
     .toISOString()
     .slice(0, 10)}.xlsx`;
 

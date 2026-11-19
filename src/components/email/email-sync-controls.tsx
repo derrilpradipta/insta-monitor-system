@@ -44,6 +44,8 @@ const STAGE_TEXT: Record<"connect" | "fetch" | "save" | "reconcile", string> = {
 type AkunState = {
   email: string;
   label: string;
+  /** Cabang pemilik akun, dipakai untuk mengelompokkan daftar di dialog. */
+  group: string;
   stage: Stage;
   note: string;
   fetch: { page: number; collected: number } | null;
@@ -52,10 +54,11 @@ type AkunState = {
 };
 
 /** Keadaan awal: semua akun menunggu. */
-function kosong(accounts: { email: string; label: string }[]): AkunState[] {
+function kosong(accounts: { email: string; label: string; group: string }[]): AkunState[] {
   return accounts.map((a) => ({
     email: a.email,
     label: a.label,
+    group: a.group,
     stage: "wait" as Stage,
     note: "",
     fetch: null,
@@ -105,7 +108,7 @@ function tandaiProgress(prev: AkunState[], event: Extract<ProgressEvent, { type:
  * NDJSON per tahap (sama seperti tombol "Ambil data" pada pesanan), jadi tidak
  * ada persentase karangan.
  */
-export function EmailSyncControls({ accounts }: { accounts: { email: string; label: string }[] }) {
+export function EmailSyncControls({ accounts }: { accounts: { email: string; label: string; group: string }[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -228,6 +231,15 @@ export function EmailSyncControls({ accounts }: { accounts: { email: string; lab
   const semuaSelesai = akun.length > 0 && akun.every((a) => a.stage === "selesai");
   const aktif = akun.find((a) => a.stage !== "selesai" && a.stage !== "wait");
 
+  // Kelompokkan per cabang: satu proses memeriksa SEMUA mailbox, jadi daftar
+  // harus memperlihatkan cabang mana yang sedang dikerjakan.
+  const perCabang: { group: string; akun: AkunState[] }[] = [];
+  for (const a of akun) {
+    const ada = perCabang.find((g) => g.group === a.group);
+    if (ada) ada.akun.push(a);
+    else perCabang.push({ group: a.group, akun: [a] });
+  }
+
   return (
     <Dialog
       open={open}
@@ -245,8 +257,8 @@ export function EmailSyncControls({ accounts }: { accounts: { email: string; lab
         <DialogHeader>
           <DialogTitle>Cek email belum dibaca</DialogTitle>
           <DialogDescription>
-            Memeriksa <span className="font-medium text-foreground">{accounts.length} mailbox</span> sekaligus dalam
-            satu proses, berurutan. Membaca di sini{" "}
+            Memeriksa <span className="font-medium text-foreground">{accounts.length} mailbox</span> dari seluruh cabang
+            sekaligus dalam satu proses, berurutan. Membaca di sini{" "}
             <span className="font-medium text-foreground">tidak</span> menandai email sebagai sudah dibaca di Gmail.
           </DialogDescription>
         </DialogHeader>
@@ -277,62 +289,93 @@ export function EmailSyncControls({ accounts }: { accounts: { email: string; lab
               <p className="text-[12px] text-muted-foreground">Akan diperiksa:</p>
             )}
 
-            <ol className="space-y-2">
-              {akun.map((a) => {
-                const sedangAktif = a.stage !== "selesai" && a.stage !== "wait";
-                const counter =
-                  a.stage === "fetch" && a.fetch
-                    ? `${a.fetch.collected} email · ${a.fetch.page} hlm`
-                    : a.stage === "save" && a.save
-                      ? `${a.save.done}/${a.save.total}`
-                      : null;
-
-                const detail = a.result
-                  ? `${a.result.unreadFound} belum dibaca` +
-                    (a.result.created ? ` · ${a.result.created} baru` : "") +
-                    (a.result.markedRead ? ` · ${a.result.markedRead} dikeluarkan` : "")
-                  : a.stage === "wait"
-                    ? a.email
-                    : a.stage === "selesai"
-                      ? "selesai"
-                      : STAGE_TEXT[a.stage];
-
+            <ol className="space-y-3.5">
+              {perCabang.map((g, gi) => {
+                const selesaiCabang = g.akun.every((a) => a.stage === "selesai");
+                const jalanCabang = g.akun.some((a) => a.stage !== "selesai" && a.stage !== "wait");
                 return (
-                  <li key={a.email} className="flex items-start gap-2">
-                    <span
-                      className={cn(
-                        "mt-px flex size-4 shrink-0 items-center justify-center rounded-full",
-                        a.stage === "selesai" && "bg-emerald-500 text-white",
-                        sedangAktif && "bg-primary/10 text-primary",
-                        a.stage === "wait" && "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {a.stage === "selesai" ? (
-                        <Check className="size-2.5" strokeWidth={3.5} />
-                      ) : sedangAktif ? (
-                        <Loader2 className="size-2.5 animate-spin" strokeWidth={3} />
-                      ) : (
-                        <span className="size-1 rounded-full bg-current" />
-                      )}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-[12.5px] leading-tight",
-                            a.stage === "wait" ? "text-muted-foreground" : "text-foreground",
-                            sedangAktif && "font-medium",
-                          )}
-                        >
-                          {a.label}
-                        </span>
-                        {counter ? (
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{counter}</span>
-                        ) : null}
-                      </div>
-                      <p className="truncate text-[11px] leading-tight text-muted-foreground">{detail}</p>
+                  <li
+                    key={g.group}
+                    className={gi === 0 ? "" : "border-t border-border pt-3.5"}
+                  >
+                    {/* Indentasi 24px = lebar titik (16px) + jarak (8px), supaya
+                        label cabang sejajar dengan nama mailbox di bawahnya. */}
+                    <div className="mb-1.5 flex items-center gap-1.5 pl-6">
+                      <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-foreground">
+                        {g.group}
+                      </span>
+                      <span className="text-[10.5px] tabular-nums text-muted-foreground">
+                        · {g.akun.length}
+                      </span>
+                      {selesaiCabang ? (
+                        <Check className="size-3 text-emerald-600" strokeWidth={3} />
+                      ) : jalanCabang ? (
+                        <Loader2 className="size-3 animate-spin text-primary" strokeWidth={3} />
+                      ) : null}
                     </div>
+
+                    <ul className="space-y-2">
+                      {g.akun.map((a) => {
+                        const sedangAktif = a.stage !== "selesai" && a.stage !== "wait";
+                        const counter =
+                          a.stage === "fetch" && a.fetch
+                            ? `${a.fetch.collected} email · ${a.fetch.page} hlm`
+                            : a.stage === "save" && a.save
+                              ? `${a.save.done}/${a.save.total}`
+                              : null;
+
+                        const detail = a.result
+                          ? `${a.result.unreadFound} belum dibaca` +
+                            (a.result.created ? ` · ${a.result.created} baru` : "") +
+                            (a.result.markedRead ? ` · ${a.result.markedRead} dikeluarkan` : "")
+                          : a.stage === "wait"
+                            ? a.email
+                            : a.stage === "selesai"
+                              ? "selesai"
+                              : STAGE_TEXT[a.stage];
+
+                        return (
+                          <li key={a.email} className="flex items-start gap-2">
+                            <span
+                              className={cn(
+                                "mt-px flex size-4 shrink-0 items-center justify-center rounded-full",
+                                a.stage === "selesai" && "bg-emerald-500 text-white",
+                                sedangAktif && "bg-primary/10 text-primary",
+                                a.stage === "wait" && "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {a.stage === "selesai" ? (
+                                <Check className="size-2.5" strokeWidth={3.5} />
+                              ) : sedangAktif ? (
+                                <Loader2 className="size-2.5 animate-spin" strokeWidth={3} />
+                              ) : (
+                                <span className="size-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span
+                                  className={cn(
+                                    "truncate text-[12.5px] leading-tight",
+                                    a.stage === "wait" ? "text-muted-foreground" : "text-foreground",
+                                    sedangAktif && "font-medium",
+                                  )}
+                                >
+                                  {a.label}
+                                </span>
+                                {counter ? (
+                                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                                    {counter}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="truncate text-[11px] leading-tight text-muted-foreground/90">{detail}</p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </li>
                 );
               })}

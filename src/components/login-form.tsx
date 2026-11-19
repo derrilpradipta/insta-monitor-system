@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState, useState, useSyncExternalStore } from "react";
-import { Eye, EyeOff, Loader2, LogIn, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { loginAction, type LoginState } from "@/app/actions/auth";
 
 const initialState: LoginState = {};
@@ -24,10 +22,10 @@ export function LoginForm({ notice }: { notice?: string }) {
   );
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="space-y-4">
       {notice ? (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+        <div className="flex items-start gap-2.5 rounded-[10px] bg-[#fdf6e7] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#8a5a12]">
+          <ShieldCheck className="mt-px size-4 shrink-0" />
           <span>{notice}</span>
         </div>
       ) : null}
@@ -35,63 +33,108 @@ export function LoginForm({ notice }: { notice?: string }) {
       {state.error ? (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700"
+          className="flex items-start gap-2.5 rounded-[10px] bg-[#fdf0ef] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#a5342b]"
         >
-          {state.error}
+          <ShieldAlert className="mt-px size-4 shrink-0" />
+          <span>{state.error}</span>
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <Label htmlFor="identifier">Email atau username</Label>
-        <Input
-          id="identifier"
-          name="identifier"
-          autoComplete="username"
-          placeholder="nama@instaprint.co.id"
-          required
-          autoFocus
-          className="h-10"
-        />
-      </div>
+      <FloatingField
+        id="identifier"
+        name="identifier"
+        label="Email atau username"
+        autoComplete="username"
+        placeholder="nama@instaprint.co.id"
+        defaultValue={state.identifier}
+        autoFocus
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            placeholder="••••••••"
-            required
-            className="h-10 pr-10"
-          />
+      <FloatingField
+        id="password"
+        name="password"
+        label="Password"
+        type={showPassword ? "text" : "password"}
+        autoComplete="current-password"
+        trailing={
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-white/80 hover:text-foreground"
             aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
           >
-            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            {showPassword ? <EyeOff className="size-[17px]" /> : <Eye className="size-[17px]" />}
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <Button type="submit" className="h-10 w-full" disabled={pending || !ready}>
+      <Button
+        type="submit"
+        disabled={pending || !ready}
+        className="h-12 w-full rounded-[10px] text-[13.5px] font-semibold shadow-[0_8px_18px_-10px_rgb(37_99_235/0.85)]"
+      >
         {pending ? (
           <>
             <Loader2 className="size-4 animate-spin" /> Memproses…
           </>
         ) : (
-          <>
-            <LogIn className="size-4" /> Masuk
-          </>
+          "Masuk"
         )}
       </Button>
-
-      <p className="text-center text-xs text-muted-foreground">
-        Sesi otomatis berakhir setelah 30 menit tanpa aktivitas.
-      </p>
     </form>
+  );
+}
+
+/**
+ * Kolom isian bergaya "label mengambang": kotak abu-abu tanpa garis, label kecil
+ * menetap di dalamnya, nilai diketik di bawah label. Khusus tampilan login —
+ * input global (`ui/input`) tetap dipakai di dalam aplikasi.
+ */
+function FloatingField({
+  id,
+  name,
+  label,
+  type = "text",
+  autoComplete,
+  placeholder,
+  defaultValue,
+  autoFocus,
+  trailing,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  type?: string;
+  autoComplete?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  autoFocus?: boolean;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <div className="relative rounded-[10px] bg-[#f4f6f8] shadow-[0_0_0_1px_transparent] transition-[box-shadow,background-color] duration-150 focus-within:bg-white focus-within:shadow-[0_0_0_1.5px_var(--primary)] hover:bg-[#eef0f3] focus-within:hover:bg-white">
+        <input
+          id={id}
+          name={name}
+          type={type}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          defaultValue={defaultValue}
+          autoFocus={autoFocus}
+          required
+          spellCheck={false}
+          className="peer h-[56px] w-full rounded-[10px] bg-transparent px-4 pb-2 pt-[26px] text-[13.5px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/90"
+          style={trailing ? { paddingRight: "2.75rem" } : undefined}
+        />
+        <label
+          htmlFor={id}
+          className="pointer-events-none absolute inset-x-4 top-[9px] text-[10.5px] font-medium leading-none text-muted-foreground"
+        >
+          {label}
+        </label>
+        {trailing}
+      </div>
+    </div>
   );
 }

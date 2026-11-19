@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
-import { getShellData } from "@/lib/query";
+import { getShellData, getEmailUnreadByGroup } from "@/lib/query";
 import { SidebarNav } from "@/components/shell/sidebar-nav";
 import { SessionGuard } from "@/components/shell/session-guard";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { session, unread } = await getShellData();
+  const [{ session, unread }, emailGroups] = await Promise.all([
+    getShellData(),
+    getEmailUnreadByGroup(),
+  ]);
 
   return (
     <div className="min-h-screen lg:pl-[228px]">
-      <SidebarNav user={session.user} unread={unread} logoutAction={logoutAction} />
+      <SidebarNav
+        user={session.user}
+        unread={unread}
+        emailGroups={emailGroups}
+        logoutAction={logoutAction}
+      />
 
       <header className="sticky top-0 z-30 flex h-[58px] items-center gap-3 border-b border-border bg-background/85 px-4 pl-14 backdrop-blur-md sm:px-6 lg:pl-6">
         <div className="min-w-0 flex-1">
