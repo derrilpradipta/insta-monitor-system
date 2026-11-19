@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import bcrypt from "bcryptjs";
 import type { Role, User } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -254,8 +255,15 @@ export async function createSession(userId: string): Promise<string> {
   return token;
 }
 
-/** Baca sesi dari cookie dan validasi ke database (server-side). */
-export async function getSession(): Promise<SessionPayload | null> {
+/**
+ * Baca sesi dari cookie dan validasi ke database (server-side).
+ *
+ * Dibungkus `cache()` milik React: dalam SATU request, layout dan halaman
+ * sama-sama memanggil ini, dan tanpa cache setiap panggilan jadi satu query
+ * database. Dengan cache, hanya query pertama yang jalan — sisanya memakai
+ * hasil yang sama dari memori.
+ */
+export const getSession = cache(async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -301,7 +309,7 @@ export async function getSession(): Promise<SessionPayload | null> {
       createdAt: session.user.createdAt,
     },
   };
-}
+});
 
 /** Wajib login. Redirect ke halaman login jika sesi tidak valid. */
 export async function requireSession(): Promise<SessionPayload> {

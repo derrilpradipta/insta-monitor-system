@@ -65,6 +65,21 @@ const nextConfig: NextConfig = {
   // tidak menyisipkan HTML mentah; 'unsafe-inline' pada style diperlukan oleh
   // atribut style inline yang dipakai komponen tabel/progress.
   poweredByHeader: false,
+
+  // Navigasi antar halaman jadi instan untuk halaman yang baru saja dibuka.
+  //
+  // Tanpa ini, Next.js menyetel masa simpan cache klien untuk halaman dinamis
+  // ke 0 detik: setiap klik tautan memaksa perjalanan ke server + database.
+  // Dengan 30 detik, kembali ke tab yang tadi dibuka langsung tampil dari
+  // cache browser, sementara data tetap diperbarui saat halaman dimuat ulang
+  // atau setelah jendela 30 detik lewat.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+
   async headers() {
     const dev = process.env.NODE_ENV !== "production";
     const csp = [

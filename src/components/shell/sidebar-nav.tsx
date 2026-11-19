@@ -73,6 +73,9 @@ export function SidebarNav({
     return (
       <Link
         href={href}
+        // Prefetch: Next.js menyiapkan halaman ini di latar saat tautan terlihat,
+        // sehingga klik berikutnya tidak perlu menunggu server.
+        prefetch
         onClick={() => setMobileOpen(false)}
         aria-current={active ? "page" : undefined}
         className={cn(
