@@ -76,7 +76,7 @@ export async function getEmailUnreadByGroup(): Promise<{ slug: string; name: str
   const semuaEmail = groups.flatMap((g) => g.accounts.map((a) => a.email));
   const rows = await prisma.emailMessage.groupBy({
     by: ["accountEmail"],
-    where: { isRead: false, accountEmail: { in: semuaEmail } },
+    where: { isRead: false, isInternal: false, accountEmail: { in: semuaEmail } },
     _count: { _all: true },
   });
 

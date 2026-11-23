@@ -100,7 +100,7 @@ export default async function WaktuBalasPage({
         ))}
         {laporan.jumlahOtomatis > 0 ? (
           <span className="ml-auto text-[11.5px] text-muted-foreground">
-            {laporan.jumlahOtomatis} email otomatis dikecualikan
+            {laporan.jumlahOtomatis} email otomatis & operan file dikecualikan
           </span>
         ) : null}
       </div>

@@ -162,3 +162,17 @@ export function findMailAccount(email: string): MailAccount | null {
 export function defaultMailAccount(): MailAccount | null {
   return readMailAccounts()[0] ?? null;
 }
+
+/**
+ * Apakah alamat ini salah satu mailbox Instaprint sendiri?
+ *
+ * Dipakai untuk menandai email antar-cabang (operan file produksi). Email
+ * semacam itu TIDAK wajib dibaca atau dibalas, jadi harus disingkirkan dari
+ * daftar "belum dibaca" dan dari laporan waktu balas — kalau ikut dihitung,
+ * angka kinerja tim jadi terlihat jauh lebih buruk daripada kenyataan.
+ */
+export function isAlamatSendiri(address: string): boolean {
+  const a = (address ?? "").trim().toLowerCase();
+  if (!a) return false;
+  return readMailAccounts().some((akun) => akun.email.toLowerCase() === a);
+}

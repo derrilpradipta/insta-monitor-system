@@ -115,6 +115,7 @@ export async function ambilLaporan(
   });
 
   const manusia = baris.filter((b) => !b.isAutomated);
+  const internal = baris.length - manusia.length;
 
   // --- Ringkasan keseluruhan ---
   const keseluruhan = ringkas(manusia);
@@ -165,7 +166,7 @@ export async function ambilLaporan(
     keseluruhan,
     perCabang,
     perJam,
-    jumlahOtomatis: baris.length - manusia.length,
+    jumlahOtomatis: internal,
     terakhirDiperbarui: terakhir?.syncedAt ?? null,
   };
 }

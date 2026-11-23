@@ -43,6 +43,8 @@ export async function GET(request: Request) {
   const emails = await prisma.emailMessage.findMany({
     where: {
       ...(semua ? {} : { isRead: false }),
+      // Operan file antar-cabang tidak wajib dibalas → jangan masuk laporan.
+      isInternal: false,
       accountEmail: { in: emailDiizinkan },
     },
     orderBy: [{ accountEmail: "asc" }, { receivedAt: "desc" }],

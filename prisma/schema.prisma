@@ -321,6 +321,12 @@ model EmailMessage {
   hasAttachments Boolean  @default(false) @map("has_attachments")
   /// true bila email sudah dibaca di mailbox (hilang dari daftar UNSEEN).
   isRead         Boolean  @default(false) @map("is_read")
+  /// true bila pengirimnya salah satu mailbox Instaprint sendiri.
+  ///
+  /// Email antar-cabang (operan file produksi) TIDAK wajib dibaca atau dibalas,
+  /// jadi tidak boleh muncul di daftar "belum dibaca" maupun laporan waktu
+  /// balas. Ditandai saat sync supaya semua query cukup menyaring satu kolom.
+  isInternal     Boolean  @default(false) @map("is_internal")
   firstSeenAt    DateTime @default(now()) @map("first_seen_at")
   lastSyncedAt   DateTime @default(now()) @map("last_synced_at")
   createdAt      DateTime @default(now()) @map("created_at")

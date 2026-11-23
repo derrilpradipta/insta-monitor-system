@@ -27,6 +27,7 @@ type ProgressEvent =
       results: {
         accountEmail: string;
         unreadFound: number;
+        internalSkipped: number;
         created: number;
         updated: number;
         markedRead: number;
@@ -50,7 +51,13 @@ type AkunState = {
   note: string;
   fetch: { page: number; collected: number } | null;
   save: { done: number; total: number } | null;
-  result: { unreadFound: number; created: number; updated: number; markedRead: number } | null;
+  result: {
+    unreadFound: number;
+    internalSkipped: number;
+    created: number;
+    updated: number;
+    markedRead: number;
+  } | null;
 };
 
 /** Keadaan awal: semua akun menunggu. */
@@ -188,6 +195,7 @@ export function EmailSyncControls({ accounts }: { accounts: { email: string; lab
                   result: hasil
                     ? {
                         unreadFound: hasil.unreadFound,
+                        internalSkipped: hasil.internalSkipped,
                         created: hasil.created,
                         updated: hasil.updated,
                         markedRead: hasil.markedRead,
@@ -327,7 +335,8 @@ export function EmailSyncControls({ accounts }: { accounts: { email: string; lab
                         const detail = a.result
                           ? `${a.result.unreadFound} belum dibaca` +
                             (a.result.created ? ` · ${a.result.created} baru` : "") +
-                            (a.result.markedRead ? ` · ${a.result.markedRead} dikeluarkan` : "")
+                            (a.result.markedRead ? ` · ${a.result.markedRead} dikeluarkan` : "") +
+                            (a.result.internalSkipped ? ` · ${a.result.internalSkipped} operan file` : "")
                           : a.stage === "wait"
                             ? a.email
                             : a.stage === "selesai"

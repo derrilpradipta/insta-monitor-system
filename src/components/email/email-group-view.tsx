@@ -58,10 +58,14 @@ export async function EmailGroupView({
   const emailsAkun = akunTersedia.map((a) => a.email);
 
   const [total, unreadAktif, emails, lastRun, unreadPerAkun] = await Promise.all([
-    prisma.emailMessage.count({ where: { accountEmail: akunAktif.email, ...(filterSemua ? {} : { isRead: false }) } }),
-    prisma.emailMessage.count({ where: { accountEmail: akunAktif.email, isRead: false } }),
+    prisma.emailMessage.count({
+      // Email antar-cabang (operan file) tidak wajib dibaca/dibalas, jadi
+      // tidak pernah ikut dihitung di daftar.
+      where: { accountEmail: akunAktif.email, isInternal: false, ...(filterSemua ? {} : { isRead: false }) },
+    }),
+    prisma.emailMessage.count({ where: { accountEmail: akunAktif.email, isRead: false, isInternal: false } }),
     prisma.emailMessage.findMany({
-      where: { accountEmail: akunAktif.email, ...(filterSemua ? {} : { isRead: false }) },
+      where: { accountEmail: akunAktif.email, isInternal: false, ...(filterSemua ? {} : { isRead: false }) },
       orderBy: { receivedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -83,7 +87,7 @@ export async function EmailGroupView({
     }),
     prisma.emailMessage.groupBy({
       by: ["accountEmail"],
-      where: { isRead: false, accountEmail: { in: emailsAkun } },
+      where: { isRead: false, isInternal: false, accountEmail: { in: emailsAkun } },
       _count: { _all: true },
     }),
   ]);

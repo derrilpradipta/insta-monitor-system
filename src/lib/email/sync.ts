@@ -4,6 +4,7 @@ import {
   readComposioConfig,
   readMailAccounts,
   findMailAccount,
+  isAlamatSendiri,
   type MailAccount,
 } from "@/lib/email/accounts";
 
@@ -19,7 +20,10 @@ export type EmailProgress =
 export type EmailSyncResult = {
   accountEmail: string;
   runId: string;
+  /** Email belum-dibaca dari pelanggan (email internal tidak dihitung). */
   unreadFound: number;
+  /** Operan file antar-cabang yang sengaja tidak dimasukkan ke daftar. */
+  internalSkipped: number;
   created: number;
   updated: number;
   markedRead: number;
@@ -75,7 +79,10 @@ export async function syncAccount(
       });
     });
 
-    unreadFound = emails.length;
+    // Email antar-cabang bukan pekerjaan pelanggan: tetap disimpan (supaya
+    // riwayat utuh) tapi ditandai, dan TIDAK dihitung sebagai "belum dibaca".
+    const internalSkipped = emails.filter((e) => isAlamatSendiri(e.fromAddress)).length;
+    unreadFound = emails.length - internalSkipped;
     const terpotong = emails.length >= LIMIT_PER_ACCOUNT;
     const idSekarang = new Set(emails.map((e) => e.messageId));
 
@@ -104,6 +111,7 @@ export async function syncAccount(
           receivedAt: email.receivedAt,
           hasAttachments: email.hasAttachments,
           isRead: false,
+          isInternal: isAlamatSendiri(email.fromAddress),
         },
         // Email yang sama dan masih belum dibaca: isinya diperbarui, tetap di
         // daftar. Kalau sebelumnya sempat tercatat sudah dibaca (mis. dibuka
@@ -116,6 +124,7 @@ export async function syncAccount(
           receivedAt: email.receivedAt,
           hasAttachments: email.hasAttachments,
           isRead: false,
+          isInternal: isAlamatSendiri(email.fromAddress),
           lastSyncedAt: new Date(),
         },
       });
@@ -163,7 +172,7 @@ export async function syncAccount(
       data: { status: "SUCCESS", finishedAt: new Date(), unreadFound, created, updated, markedRead },
     });
 
-    return { accountEmail: account.email, runId: run.id, unreadFound, created, updated, markedRead };
+    return { accountEmail: account.email, runId: run.id, unreadFound, internalSkipped, created, updated, markedRead };
   } catch (error) {
     const pesan = error instanceof Error ? error.message : String(error);
     await prisma.emailSyncRun.update({
