@@ -42,6 +42,8 @@ enum ProcessType {
   DAILY_SCRAPE
   STATUS_SYNC
   MONTHLY_REVIEW
+  /// Laporan daftar deadline hari itu yang dikirim ke email.
+  DEADLINE_REPORT
 }
 
 enum ProcessStatus {

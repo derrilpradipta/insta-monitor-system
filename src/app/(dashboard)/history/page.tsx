@@ -45,6 +45,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             { value: "DAILY_SCRAPE", label: "Harian" },
             { value: "STATUS_SYNC", label: "Sinkronisasi" },
             { value: "MONTHLY_REVIEW", label: "Bulanan" },
+            { value: "DEADLINE_REPORT", label: "Laporan email" },
           ].map((item) => (
             <Button
               key={item.value || "all"}
@@ -66,7 +67,10 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
           />
         ) : (
           <>
-            <Table>
+            {/* Lebar minimum diturunkan dari 1180px bawaan: dengan 10 kolom,
+                tabel ini masih terbaca di 1100px sehingga tombol Detail tidak
+                perlu digeser di layar desktop biasa. */}
+            <Table className="min-w-[1100px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[9%]">Proses</TableHead>
@@ -91,8 +95,12 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                     <TableCell className="overflow-hidden"><span className="block truncate text-[12.5px] text-muted-foreground">{formatDateTimeId(log.startedAt)}</span></TableCell>
                     <TableCell className="overflow-hidden"><span className="block truncate text-[12.5px] text-muted-foreground">{log.finishedAt ? formatDateTimeId(log.finishedAt) : "—"}</span></TableCell>
                     <TableCell className="text-right text-[12.5px] tabular-nums">{formatNumber(log.totalFound)}</TableCell>
-                    <TableCell className="text-right text-[12.5px] tabular-nums">{formatNumber(log.totalCreated)}</TableCell>
-                    <TableCell className="text-right text-[12.5px] tabular-nums">{formatNumber(log.totalUpdated)}</TableCell>
+                    <TableCell className="text-right text-[12.5px] tabular-nums">
+                      {log.processType === "DEADLINE_REPORT" ? "—" : formatNumber(log.totalCreated)}
+                    </TableCell>
+                    <TableCell className="text-right text-[12.5px] tabular-nums">
+                      {log.processType === "DEADLINE_REPORT" ? "—" : formatNumber(log.totalUpdated)}
+                    </TableCell>
                     <TableCell className="text-right text-[12.5px] tabular-nums">{formatNumber(log.totalFailed)}</TableCell>
                     <TableCell>
                       <Badge className={processStatusClass(log.status)}>

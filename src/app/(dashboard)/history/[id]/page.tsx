@@ -32,7 +32,9 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
             <ArrowLeft className="size-4" /> Kembali
           </Link>
         </Button>
-        {log.status === "FAILED" || log.status === "PARTIAL" ? (
+        {/* Laporan email diulang lewat tombol di halaman Deadline, bukan
+            lewat route scraper — jenis ini tidak dikenal di sana. */}
+        {(log.status === "FAILED" || log.status === "PARTIAL") && log.processType !== "DEADLINE_REPORT" ? (
           <RetryButton logId={log.id} processType={log.processType} targetDate={log.targetDate?.toISOString().slice(0, 10)} />
         ) : null}
       </PageHeader>
@@ -56,12 +58,18 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Baru / diperbarui</CardTitle>
+            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
+              {log.processType === "DEADLINE_REPORT" ? "Dikirim ke" : "Baru / diperbarui"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">
-              {formatNumber(log.totalCreated)} / {formatNumber(log.totalUpdated)}
-            </p>
+            {log.processType === "DEADLINE_REPORT" ? (
+              <p className="break-all text-[13px] font-medium">{String(detail.toEmails ?? "—")}</p>
+            ) : (
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatNumber(log.totalCreated)} / {formatNumber(log.totalUpdated)}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -88,6 +96,13 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
           <Row label="Dipicu oleh" value={log.triggeredBy ?? "sistem"} />
           <Row label="Dilewati" value={formatNumber(log.totalSkipped)} />
           <Row label="Cabang diproses" value={outlets.length ? outlets.join(", ") : "—"} />
+          {log.processType === "DEADLINE_REPORT" ? (
+            <>
+              <Row label="Dari akun" value={String(detail.fromEmail ?? "—")} />
+              <Row label="Dikirim ke" value={String(detail.toEmails ?? "—")} />
+              <Row label="Nama berkas" value={String(detail.fileName ?? "—")} />
+            </>
+          ) : null}
           {log.retryOfId ? <Row label="Percobaan ulang dari" value={log.retryOfId} /> : null}
         </CardContent>
       </Card>

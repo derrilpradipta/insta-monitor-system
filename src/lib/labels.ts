@@ -32,6 +32,7 @@ export const PROCESS_TYPE_LABEL: Record<ProcessType, string> = {
   DAILY_SCRAPE: "Pengambilan harian",
   STATUS_SYNC: "Sinkronisasi status",
   MONTHLY_REVIEW: "Pemeriksaan bulanan",
+  DEADLINE_REPORT: "Kirim laporan email",
 };
 
 export const PROCESS_STATUS_LABEL: Record<ProcessStatus, string> = {

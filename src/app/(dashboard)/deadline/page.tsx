@@ -21,6 +21,7 @@ import { PageHeader, EmptyState } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { ChecklistUploadButton } from "@/components/orders/checklist-upload-button";
+import { KirimLaporanButton } from "@/components/deadline/kirim-laporan-button";
 import { RunScrapeButton } from "@/components/orders/run-scrape-button";
 
 export const metadata = { title: "Deadline" };
@@ -221,6 +222,9 @@ export default async function DeadlinePage({ searchParams }: { searchParams: Pro
             </a>
           </Button>
           <ChecklistUploadButton />
+          {/* Kirim laporan untuk tanggal yang sedang dibuka; hanya masuk akal
+              pada mode satu tanggal, bukan rentang atau bulan. */}
+          {isSingleDay && !isNoDeadline ? <KirimLaporanButton tanggal={date} /> : null}
         </div>
       </PageHeader>
 

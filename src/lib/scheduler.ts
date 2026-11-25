@@ -183,4 +183,28 @@ export function startScheduler() {
       options,
     );
   }
+
+  // Laporan deadline pagi: kirim daftar pesanan yang tenggat hari itu ke
+  // alamat yang sudah ditentukan. Hanya untuk hari yang benar-benar punya
+  // pesanan — mengirim lampiran kosong tiap hari melatih penerima
+  // mengabaikan email ini.
+  if (process.env.COMPOSIO_API_KEY && process.env.DEADLINE_REPORT_TO) {
+    cron.schedule(
+      process.env.CRON_DEADLINE_REPORT ?? "0 8 * * *",
+      async () => {
+        try {
+          const { kirimLaporanDeadline } = await import("@/lib/email/deadline-report");
+          const hasil = await kirimLaporanDeadline({ triggeredBy: "cron-internal" });
+          console.log(
+            hasil.skipped
+              ? `[cron] laporan deadline dilewati: ${hasil.reason ?? "tidak ada pesanan"}`
+              : `[cron] laporan deadline terkirim: ${hasil.orderCount} pesanan → ${hasil.to.join(", ")}`,
+          );
+        } catch (error) {
+          console.error("[cron] laporan deadline gagal", error);
+        }
+      },
+      options,
+    );
+  }
 }

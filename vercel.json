@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "crons": [
     {
       "path": "/api/cron?job=daily",
@@ -12,6 +14,12 @@
       "schedule": "0 8-23 * * *",
       "timezone": "Asia/Jakarta",
       "path": "/api/email/sync",
+      "requestMethod": "POST"
+    },
+    "laporan-deadline-pagi": {
+      "schedule": "0 8 * * *",
+      "timezone": "Asia/Jakarta",
+      "path": "/api/email/deadline-report",
       "requestMethod": "POST"
     }
   }
