@@ -206,6 +206,11 @@ model ScrapingLog {
   totalFailed  Int           @default(0) @map("total_failed")
   targetDate   DateTime?     @map("target_date") @db.Date
   retryOfId    String?       @map("retry_of_id")
+  /// Kunci anti-kirim-ganda untuk proses otomatis, mis. "deadline:2026-11-25".
+  /// Indeks uniknya membuat dua penjadwal yang berjalan bersamaan tidak bisa
+  /// sama-sama membuat log baru — yang kalah ditolak database, bukan dicek
+  /// lebih dulu di kode (pola cek-lalu-tulis tetap bisa balapan).
+  dedupeKey    String?       @unique @map("dedupe_key")
   triggeredBy  String?       @map("triggered_by")
   errorMessage String?       @map("error_message")
   detail       Json?         @map("detail")

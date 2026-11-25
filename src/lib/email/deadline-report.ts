@@ -208,13 +208,15 @@ export async function kirimLaporanDeadline(
   // Penjaga kiriman ganda. Dua penjadwal bisa aktif bersamaan (Vercel
   // Schedules dan penjadwal internal di server), dan tanpa penjaga ini
   // penerima mendapat dua email berisi lampiran yang sama.
+  //
+  // Kuncinya indeks UNIK di database, bukan pengecekan lebih dulu: pola
+  // "cek lalu tulis" tetap bisa balapan kalau kedua penjadwal memeriksa
+  // pada saat yang sama dan dua-duanya melihat "belum ada".
   // Tombol "Kirim ke email" memakai `paksa: true` karena itu permintaan sadar
-  // dari pengguna yang memang ingin mengirim ulang.
-  if (!opsi.paksa) {
-    const sudah = await prisma.scrapingLog.findFirst({
-      where: { processType: "DEADLINE_REPORT", status: "SUCCESS", targetDate: new Date(`${tanggal}T00:00:00.000Z`) },
-      select: { id: true, totalFound: true },
-    });
+  // pengguna yang memang ingin mengirim ulang.
+  const dedupeKey = opsi.paksa ? null : `deadline:${tanggal}`;
+  if (dedupeKey) {
+    const sudah = await prisma.scrapingLog.findUnique({ where: { dedupeKey } });
     if (sudah) {
       return {
         runId: sudah.id,
@@ -233,19 +235,39 @@ export async function kirimLaporanDeadline(
   // Riwayat ditulis ke `scraping_logs` — tabel yang sama dengan pengambilan
   // data pesanan — supaya semuanya terlihat di satu halaman Riwayat. Jenisnya
   // dibedakan lewat processType = DEADLINE_REPORT.
-  const run = await prisma.scrapingLog.create({
-    data: {
-      processType: "DEADLINE_REPORT",
-      status: "RUNNING",
-      targetDate: new Date(`${tanggal}T00:00:00.000Z`),
-      triggeredBy: opsi.triggeredBy ?? null,
-      detail: {
-        fromEmail: akun.email,
-        toEmails: ke.join(","),
-        reportDate: tanggal,
+  let run;
+  try {
+    run = await prisma.scrapingLog.create({
+      data: {
+        processType: "DEADLINE_REPORT",
+        status: "RUNNING",
+        targetDate: new Date(`${tanggal}T00:00:00.000Z`),
+        dedupeKey,
+        triggeredBy: opsi.triggeredBy ?? null,
+        detail: {
+          fromEmail: akun.email,
+          toEmails: ke.join(","),
+          reportDate: tanggal,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    // Kalah balapan: penjadwal lain sudah membuat log untuk tanggal ini.
+    // Itu bukan kegagalan — cukup laporkan sebagai dilewati.
+    if (dedupeKey && error instanceof Error && "code" in error && (error as { code?: string }).code === "P2002") {
+      const sudah = await prisma.scrapingLog.findUnique({ where: { dedupeKey } });
+      return {
+        runId: sudah?.id ?? "",
+        reportDate: tanggal,
+        to: ke,
+        orderCount: sudah?.totalFound ?? 0,
+        fileName: "",
+        skipped: true,
+        reason: "Laporan tanggal ini sudah terkirim sebelumnya.",
+      };
+    }
+    throw error;
+  }
 
   try {
     const excel = await buatExcelDeadline({ dari: tanggal, sampai: tanggal });
@@ -324,7 +346,10 @@ export async function kirimLaporanDeadline(
     const pesan = error instanceof Error ? error.message : String(error);
     await prisma.scrapingLog.update({
       where: { id: run.id },
-      data: { status: "FAILED", finishedAt: new Date(), errorMessage: pesan.slice(0, 2000) },
+      // Kunci dilepas saat gagal supaya penjadwal berikutnya boleh mencoba
+      // lagi; kalau kunci tetap terpasang, kegagalan pagi ini membuat
+      // laporan tidak akan pernah terkirim hari itu.
+      data: { status: "FAILED", finishedAt: new Date(), errorMessage: pesan.slice(0, 2000), dedupeKey: null },
     });
     throw error;
   }
